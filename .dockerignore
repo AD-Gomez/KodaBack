@@ -1,0 +1,33 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Test
+coverage/
+.nyc_output/
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal

@@ -1,0 +1,1 @@
+export { createContratosRouter } from './presentation/contratos.routes.js';

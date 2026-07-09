@@ -1,0 +1,1 @@
+export { createDepartamentosRouter } from './presentation/departamentos.routes.js';

@@ -1,0 +1,1 @@
+export { createReparacionesRouter } from './presentation/reparaciones.routes.js';

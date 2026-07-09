@@ -1,0 +1,369 @@
+// Prisma schema for KodaHouse - Sistema de gestión de propiedades
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =================== ENUMS ===================
+
+enum RolUsuario {
+  ADMIN
+  CONTADOR
+  ABOGADO
+}
+
+enum EstadoDepartamento {
+  OCUPADO
+  VACIO
+  MANTENIMIENTO
+  RESERVADO
+}
+
+enum EstadoArrendatario {
+  ACTIVO
+  INACTIVO
+  MOROSO
+  PENDIENTE
+}
+
+enum TipoDocumento {
+  CEDULA
+  CONTRATO
+  COMPROBANTE_DOMICILIO
+  CURP
+  OTRO
+}
+
+enum EstadoContrato {
+  BORRADOR
+  VIGENTE
+  VENCIDO
+  RENOVADO
+  CANCELADO
+}
+
+enum TipoFirma {
+  ARRENDATARIO
+  PROPIETARIO
+  TESTIGO
+}
+
+enum EstadoFirma {
+  PENDIENTE
+  FIRMADO
+  RECHAZADO
+}
+
+enum PrioridadReparacion {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum EstadoReparacion {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADA
+  CANCELADA
+}
+
+enum TipoReparacion {
+  PLOMERIA
+  ELECTRICA
+  AIRE_ACONDICIONADO
+  JARDINERIA
+  CERRAJERIA
+  PINTURA
+  OTRO
+}
+
+enum FrecuenciaServicio {
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+enum EstadoServicio {
+  ACTIVO
+  PROGRAMADO
+  PAUSADO
+  CANCELADO
+}
+
+// =================== MODELS ===================
+
+model Usuario {
+  id           String   @id @default(uuid())
+  nombre       String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  rol          RolUsuario
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  contratosCreados Contrato[]      @relation("ContratoCreadoPor")
+  reparaciones     Reparacion[]    @relation("ReparacionSolicitante")
+  refreshTokens    RefreshToken[]
+
+  @@map("usuarios")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  usuarioId String   @map("usuario_id")
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("refresh_tokens")
+}
+
+model Departamento {
+  id                String   @id @default(uuid())
+  nombre            String   @unique
+  direccion         String
+  puntoReferencia   String?  @map("punto_referencia")
+  montoCompra       Decimal  @map("monto_compra") @db.Decimal(12, 2)
+  alquiler          Decimal  @db.Decimal(12, 2)
+  distribucion      String
+  inmobiliario      String
+  serviciosActivos  String?  @map("servicios_activos")
+  renovacionContrato DateTime? @map("renovacion_contrato") @db.Date
+  estado            EstadoDepartamento @default(VACIO)
+  imagen            String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  arrendatario   Arrendatario? @relation("DepartamentoArrendatario")
+  contratos      Contrato[]
+  reparaciones   Reparacion[]
+  servicios      ServicioActivo[]
+
+  @@index([estado])
+  @@map("departamentos")
+}
+
+model Arrendatario {
+  id               String   @id @default(uuid())
+  nombre           String
+  email            String   @unique
+  telefono         String
+  telefonoFamiliar String?  @map("telefono_familiar")
+  nombreFamiliar   String?  @map("nombre_familiar")
+  direccion        String?
+  departamentoId   String?  @unique @map("departamento_id")
+  fechaIngreso     DateTime @map("fecha_ingreso") @db.Date
+  estado           EstadoArrendatario @default(ACTIVO)
+  renta            Decimal  @db.Decimal(12, 2)
+  historialPagos   String?  @map("historial_pagos")
+  avatar           String?
+  notas            String?
+
+  // Identidad
+  tipoIdentidad         String  @map("tipo_identidad")
+  numeroIdentidad       String  @map("numero_identidad")
+  fechaExpedicion       DateTime @map("fecha_expedicion") @db.Date
+  fechaVencimiento      DateTime @map("fecha_vencimiento") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  departamento Departamento? @relation("DepartamentoArrendatario", fields: [departamentoId], references: [id], onDelete: SetNull)
+  contratos    Contrato[]
+  documentos   Documento[]
+
+  @@index([estado])
+  @@index([departamentoId])
+  @@map("arrendatarios")
+}
+
+model Documento {
+  id             String        @id @default(uuid())
+  arrendatarioId String        @map("arrendatario_id")
+  nombre         String
+  tipo           TipoDocumento
+  url            String
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  arrendatario Arrendatario @relation(fields: [arrendatarioId], references: [id], onDelete: Cascade)
+
+  @@index([arrendatarioId])
+  @@map("documentos")
+}
+
+model Contrato {
+  id              String         @id @default(uuid())
+  departamentoId  String         @map("departamento_id")
+  arrendatarioId  String         @map("arrendatario_id")
+  version         Int            @default(1)
+  fechaInicio     DateTime       @map("fecha_inicio") @db.Date
+  fechaFin        DateTime       @map("fecha_fin") @db.Date
+  estado          EstadoContrato @default(BORRADOR)
+  url             String?
+  creadoPorId     String?        @map("creado_por_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  departamento Departamento     @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
+  arrendatario Arrendatario     @relation(fields: [arrendatarioId], references: [id], onDelete: Restrict)
+  creadoPor    Usuario?         @relation("ContratoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  clausulas    Clausula[]
+  firmas       Firma[]
+  envios       EnvioFirma[]
+  documentos   DocumentoContrato[]
+  historial    HistorialContrato[]
+
+  @@unique([departamentoId, version])
+  @@index([estado])
+  @@index([arrendatarioId])
+  @@map("contratos")
+}
+
+model Clausula {
+  id         String   @id @default(uuid())
+  contratoId String   @map("contrato_id")
+  texto      String
+  orden      Int
+  editable   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@map("clausulas")
+}
+
+model Firma {
+  id         String      @id @default(uuid())
+  contratoId String      @map("contrato_id")
+  nombre     String
+  email      String?
+  tipo       TipoFirma
+  estado     EstadoFirma @default(PENDIENTE)
+  fecha      DateTime?   @db.Date
+  hash       String?
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@map("firmas")
+}
+
+model EnvioFirma {
+  id         String        @id @default(uuid())
+  contratoId String        @map("contrato_id")
+  nombre     String
+  email      String
+  fechaEnvio DateTime      @map("fecha_envio") @default(now())
+  estado     EstadoFirma   @default(PENDIENTE)
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@map("envios_firma")
+}
+
+model DocumentoContrato {
+  id         String   @id @default(uuid())
+  contratoId String   @map("contrato_id")
+  nombre     String
+  tipo       String   // CONTRATO, ANEXO, CARTA, etc.
+  url        String
+  fecha      DateTime @default(now()) @db.Date
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@map("documentos_contrato")
+}
+
+model HistorialContrato {
+  id         String   @id @default(uuid())
+  contratoId String   @map("contrato_id")
+  version    Int
+  fecha      DateTime @db.Date
+  cambios    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@map("historial_contratos")
+}
+
+model Reparacion {
+  id              String            @id @default(uuid())
+  titulo          String
+  descripcion     String
+  departamentoId  String            @map("departamento_id")
+  prioridad       PrioridadReparacion
+  estado          EstadoReparacion  @default(PENDIENTE)
+  fechaSolicitud  DateTime          @map("fecha_solicitud") @db.Date
+  fechaProgramada DateTime?         @map("fecha_programada") @db.Date
+  fechaCompletada DateTime?         @map("fecha_completada") @db.Date
+  costo           Decimal?          @db.Decimal(12, 2)
+  solicitanteId   String?           @map("solicitante_id")
+  tecnico         String?
+  tipo            TipoReparacion
+  notas           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  solicitante  Usuario?    @relation("ReparacionSolicitante", fields: [solicitanteId], references: [id], onDelete: SetNull)
+
+  @@index([estado])
+  @@index([departamentoId])
+  @@map("reparaciones")
+}
+
+model ServicioActivo {
+  id             String            @id @default(uuid())
+  nombre         String
+  departamentoId String            @map("departamento_id")
+  tipo           TipoReparacion
+  frecuencia     FrecuenciaServicio
+  proximaFecha   DateTime          @map("proxima_fecha") @db.Date
+  estado         EstadoServicio    @default(ACTIVO)
+  proveedor      String?
+  costoMensual   Decimal           @map("costo_mensual") @db.Decimal(12, 2)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+  @@index([estado])
+  @@index([departamentoId])
+  @@map("servicios_activos")
+}
+
+model Pago {
+  id              String   @id @default(uuid())
+  departamentoId  String   @map("departamento_id")
+  monto           Decimal  @db.Decimal(12, 2)
+  fecha           DateTime @db.Date
+  concepto        String
+  metodoPago      String?  @map("metodo_pago")
+  referencia      String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([departamentoId])
+  @@index([fecha])
+  @@map("pagos")
+}

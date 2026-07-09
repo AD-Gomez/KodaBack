@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kodaback-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: koda
+      POSTGRES_PASSWORD: koda_secret
+      POSTGRES_DB: kodaback
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U koda -d kodaback']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local

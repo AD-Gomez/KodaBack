@@ -1,0 +1,1 @@
+export { createArrendatariosRouter } from './presentation/arrendatarios.routes.js';
