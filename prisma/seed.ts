@@ -1,6 +1,8 @@
 import { PrismaClient, type Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
+import { env } from '../src/config/env.js';
+
 const prisma = new PrismaClient();
 
 // Helper para fechas con día específico del mes (ej. día 15)
@@ -30,7 +32,7 @@ async function main(): Promise<void> {
   await prisma.usuario.deleteMany();
 
   // ============== USUARIOS ==============
-  const passwordHash = await bcrypt.hash('KodaHouse2024!', 10);
+  const passwordHash = await bcrypt.hash(env.DEMO_PASSWORD, env.BCRYPT_ROUNDS);
 
   const admin = await prisma.usuario.create({
     data: {
@@ -606,11 +608,11 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log('\n📝 Credenciales de acceso:');
   // eslint-disable-next-line no-console
-  console.log('   Email: admin@kodahouse.com | Password: KodaHouse2024!');
+  console.log(`   Email: ${admin.email} | Password: ${env.DEMO_PASSWORD}`);
   // eslint-disable-next-line no-console
-  console.log('   Email: contador@kodahouse.com | Password: KodaHouse2024!');
+  console.log(`   Email: ${contador.email} | Password: ${env.DEMO_PASSWORD}`);
   // eslint-disable-next-line no-console
-  console.log('   Email: abogado@kodahouse.com | Password: KodaHouse2024!');
+  console.log(`   Email: ${abogado.email} | Password: ${env.DEMO_PASSWORD}`);
 }
 
 main()

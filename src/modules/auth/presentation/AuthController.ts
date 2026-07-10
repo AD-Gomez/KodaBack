@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 
+import { env } from '../../../config/env.js';
 import { NotFoundError } from '../../../shared/errors/index.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 import { paginate } from '../../../shared/utils/pagination.js';
@@ -38,6 +39,26 @@ export class AuthController {
     const dto = req.body as LoginDto;
     const tokens = await this.loginUseCase.execute(dto);
     res.status(200).json({ success: true, data: tokens });
+  });
+
+  demoUsers = asyncHandler(async (_req: Request, res: Response) => {
+    if (env.NODE_ENV === 'production') {
+      res.status(404).json({ success: false, error: 'Not found' });
+      return;
+    }
+    const { prisma } = await import('../../../config/database.js');
+    const users = await prisma.usuario.findMany({
+      where: { email: { endsWith: '@kodahouse.com' } },
+      select: { email: true, nombre: true, rol: true },
+      orderBy: { rol: 'asc' },
+    });
+    res.json({
+      success: true,
+      data: {
+        users,
+        password: env.DEMO_PASSWORD,
+      },
+    });
   });
 
   refresh = asyncHandler(async (req: Request, res: Response) => {

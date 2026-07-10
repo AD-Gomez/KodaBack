@@ -56,6 +56,7 @@ export function createAuthRouter(): Router {
 
   // ============ Rutas públicas ============
   router.post('/login', authRateLimiter, validate(loginSchema), controller.login);
+  router.get('/demo-users', controller.demoUsers);
   router.post('/refresh', validate(refreshSchema), controller.refresh);
 
   // ============ Rutas autenticadas (cualquier rol) ============

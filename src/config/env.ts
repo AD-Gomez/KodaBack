@@ -26,6 +26,8 @@ const envSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
+
+  DEMO_PASSWORD: z.string().default('KodaHouse2024!'),
 });
 
 const parsed = envSchema.safeParse(process.env);
