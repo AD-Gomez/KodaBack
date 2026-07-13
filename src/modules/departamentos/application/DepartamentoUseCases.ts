@@ -43,7 +43,7 @@ export interface CreateDepartamentoInput {
   distribucion: string;
   inmobiliario: string;
   serviciosActivos?: string;
-  renovacionContrato?: string;
+  renovacionContrato?: string | null;
   estado?: string;
   imagen?: string;
 }

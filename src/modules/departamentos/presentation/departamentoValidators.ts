@@ -10,6 +10,7 @@ const decimalPositive = decimalString.refine((n) => n > 0, 'Debe ser mayor a 0')
 const dateString = z
   .string()
   .refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha inválida')
+  .nullable()
   .optional();
 
 const estadoEnum = z.enum(['OCUPADO', 'VACIO', 'MANTENIMIENTO', 'RESERVADO']);
