@@ -15,6 +15,8 @@ export interface CreateContratoInput {
   fechaInicio: string;
   fechaFin: string;
   estado?: EstadoContrato;
+  titulo?: string;
+  contenido?: string;
   url?: string;
   creadoPorId?: string;
   clausulasIniciales?: string[];
@@ -73,6 +75,8 @@ export class CreateContratoUseCase {
       fechaInicio: new Date(input.fechaInicio),
       fechaFin: new Date(input.fechaFin),
       estado: input.estado ?? 'BORRADOR',
+      titulo: input.titulo,
+      contenido: input.contenido,
       url: input.url,
       creadoPor: input.creadoPorId ? { connect: { id: input.creadoPorId } } : undefined,
     });
@@ -98,6 +102,8 @@ export class UpdateContratoUseCase {
     if (input.fechaInicio !== undefined) data.fechaInicio = new Date(input.fechaInicio);
     if (input.fechaFin !== undefined) data.fechaFin = new Date(input.fechaFin);
     if (input.estado !== undefined) data.estado = input.estado;
+    if (input.titulo !== undefined) data.titulo = input.titulo;
+    if (input.contenido !== undefined) data.contenido = input.contenido;
     if (input.url !== undefined) data.url = input.url;
     if (input.version !== undefined) data.version = input.version;
 

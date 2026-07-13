@@ -11,6 +11,7 @@ import { httpLogger } from './shared/middleware/requestLogger.js';
 import { createAuthRouter } from './modules/auth/index.js';
 import { createArrendatariosRouter } from './modules/arrendatarios/index.js';
 import { createContratosRouter } from './modules/contratos/index.js';
+import { createConfiguracionRouter } from './modules/configuracion/index.js';
 import { createDashboardRouter } from './modules/dashboard/index.js';
 import { createDepartamentosRouter } from './modules/departamentos/index.js';
 import { createReparacionesRouter } from './modules/reparaciones/index.js';
@@ -58,6 +59,7 @@ export function createApp(): Application {
   apiRouter.use('/arrendatarios', createArrendatariosRouter());
   apiRouter.use('/reparaciones', createReparacionesRouter());
   apiRouter.use('/contratos', createContratosRouter());
+  apiRouter.use('/configuracion', createConfiguracionRouter());
 
   app.use(env.API_PREFIX, apiRouter);
 

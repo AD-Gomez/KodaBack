@@ -214,6 +214,8 @@ model Contrato {
   fechaInicio     DateTime       @map("fecha_inicio") @db.Date
   fechaFin        DateTime       @map("fecha_fin") @db.Date
   estado          EstadoContrato @default(BORRADOR)
+  titulo          String?
+  contenido       String?        @db.Text
   url             String?
   creadoPorId     String?        @map("creado_por_id")
   createdAt       DateTime       @default(now()) @map("created_at")
@@ -232,6 +234,17 @@ model Contrato {
   @@index([estado])
   @@index([arrendatarioId])
   @@map("contratos")
+}
+
+model PlantillaContrato {
+  id        String   @id @default("principal")
+  titulo    String   @default("Contrato de arrendamiento")
+  contenido String   @default("") @db.Text
+  clausulas String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("plantillas_contrato")
 }
 
 model Clausula {

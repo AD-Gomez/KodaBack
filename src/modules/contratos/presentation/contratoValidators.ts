@@ -21,6 +21,8 @@ export const createContratoSchema = z.object({
   fechaInicio: dateString,
   fechaFin: dateString,
   estado: estadoContratoEnum.optional().default('BORRADOR'),
+  titulo: z.string().trim().min(3).max(160).optional(),
+  contenido: z.string().max(20000).optional(),
   url: z.string().url().optional(),
   clausulasIniciales: z.array(z.string().min(1)).optional(),
 });
@@ -29,6 +31,8 @@ export const updateContratoSchema = z.object({
   fechaInicio: dateString.optional(),
   fechaFin: dateString.optional(),
   estado: estadoContratoEnum.optional(),
+  titulo: z.string().trim().min(3).max(160).optional(),
+  contenido: z.string().max(20000).optional(),
   url: z.string().url().optional(),
   version: z.coerce.number().int().min(1).optional(),
 });
