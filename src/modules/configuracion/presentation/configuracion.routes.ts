@@ -5,6 +5,7 @@ import { prisma } from '../../../config/database.js';
 import { authMiddleware, requireRoles } from '../../../shared/middleware/authMiddleware.js';
 import { validate } from '../../../shared/middleware/validate.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
+import { sanitizeRichText } from '../../../shared/utils/sanitizeRichText.js';
 
 const plantillaContratoSchema = z.object({
   titulo: z.string().trim().min(3).max(160),
@@ -30,10 +31,11 @@ export function createConfiguracionRouter(): Router {
   }));
 
   router.put('/contrato', requireRoles('ADMIN'), validate(plantillaContratoSchema), asyncHandler(async (req, res) => {
+    const data = { ...req.body, contenido: sanitizeRichText(req.body.contenido) };
     const plantilla = await prisma.plantillaContrato.upsert({
       where: { id: PLANTILLA_ID },
-      create: { id: PLANTILLA_ID, ...req.body },
-      update: req.body,
+      create: { id: PLANTILLA_ID, ...data },
+      update: data,
     });
     res.json({ success: true, data: plantilla });
   }));

@@ -1,4 +1,5 @@
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/index.js';
+import { sanitizeRichText } from '../../../shared/utils/sanitizeRichText.js';
 
 import type {
   ContratoCompleto,
@@ -76,7 +77,7 @@ export class CreateContratoUseCase {
       fechaFin: new Date(input.fechaFin),
       estado: input.estado ?? 'BORRADOR',
       titulo: input.titulo,
-      contenido: input.contenido,
+      contenido: input.contenido ? sanitizeRichText(input.contenido) : undefined,
       url: input.url,
       creadoPor: input.creadoPorId ? { connect: { id: input.creadoPorId } } : undefined,
     });
@@ -103,7 +104,7 @@ export class UpdateContratoUseCase {
     if (input.fechaFin !== undefined) data.fechaFin = new Date(input.fechaFin);
     if (input.estado !== undefined) data.estado = input.estado;
     if (input.titulo !== undefined) data.titulo = input.titulo;
-    if (input.contenido !== undefined) data.contenido = input.contenido;
+    if (input.contenido !== undefined) data.contenido = sanitizeRichText(input.contenido);
     if (input.url !== undefined) data.url = input.url;
     if (input.version !== undefined) data.version = input.version;
 
