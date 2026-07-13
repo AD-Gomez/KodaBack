@@ -15,6 +15,7 @@ import { createConfiguracionRouter } from './modules/configuracion/index.js';
 import { createDashboardRouter } from './modules/dashboard/index.js';
 import { createDepartamentosRouter } from './modules/departamentos/index.js';
 import { createReparacionesRouter } from './modules/reparaciones/index.js';
+import { createFirmasPublicRouter } from './modules/firmas-public/firmasPublic.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -35,9 +36,6 @@ export function createApp(): Application {
   // Logging
   app.use(httpLogger);
 
-  // Rate limiting
-  app.use(generalRateLimiter);
-
   // Health check
   app.get('/health', (_req, res) => {
     res.json({
@@ -51,7 +49,13 @@ export function createApp(): Application {
     });
   });
 
-  // API v1
+  // API v1 pública (sin auth, sin rate limit general) — para links de firma
+  app.use(env.API_PREFIX, createFirmasPublicRouter());
+
+  // Rate limiting (después de las rutas públicas para no penalizar a los firmantes)
+  app.use(generalRateLimiter);
+
+  // API v1 autenticada
   const apiRouter = Router();
   apiRouter.use('/auth', createAuthRouter());
   apiRouter.use('/dashboard', createDashboardRouter());

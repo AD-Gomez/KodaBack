@@ -1,8 +1,12 @@
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/index.js';
+import { emailService } from '../../../shared/email/BrevoEmailService.js';
+import { buildSignatureEmail } from '../../../shared/email/templates/signatureEmail.js';
+import { logger } from '../../../shared/logger.js';
 import { sanitizeRichText } from '../../../shared/utils/sanitizeRichText.js';
 
 import type {
   ContratoCompleto,
+  EnvioFirma,
   EstadoContrato,
   EstadoFirma,
   TipoFirma,
@@ -223,11 +227,90 @@ export class RemoveFirmaUseCase {
 
 // ============ Envíos de firma ============
 
+export interface AddEnvioFirmaInput {
+  contratoId: string;
+  nombre: string;
+  email: string;
+  creadoPorNombre?: string;
+}
+
+export interface AddEnvioFirmaResult {
+  envio: EnvioFirma;
+  emailSent: boolean;
+  emailError?: string;
+}
+
 export class AddEnvioFirmaUseCase {
   constructor(private readonly repository: ContratoRepository) {}
 
-  async execute(data: { contratoId: string; nombre: string; email: string }) {
-    return this.repository.addEnvioFirma(data);
+  async execute(input: AddEnvioFirmaInput): Promise<AddEnvioFirmaResult> {
+    const contrato = await this.repository.findById(input.contratoId);
+    if (!contrato) throw new NotFoundError('Contrato');
+
+    const envio = await this.repository.addEnvioFirma({
+      contratoId: input.contratoId,
+      nombre: input.nombre,
+      email: input.email,
+    });
+
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    try {
+      const template = buildSignatureEmail({
+        firmanteNombre: envio.nombre,
+        departamentoNombre: contrato.departamento?.nombre ?? 'tu propiedad',
+        contratoId: contrato.id,
+        contratoTitulo: contrato.titulo,
+        fechaInicio: contrato.fechaInicio,
+        fechaFin: contrato.fechaFin,
+        token: envio.token,
+        remitenteNombre: input.creadoPorNombre,
+      });
+
+      await emailService.send({
+        to: { email: envio.email, name: envio.nombre },
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+        replyTo: { email: 'legal@kodahouses.com', name: 'KodaHouse · Legal' },
+      });
+      emailSent = true;
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : 'Error desconocido al enviar el correo';
+      logger.error(
+        { err, envioId: envio.id, contratoId: contrato.id, email: envio.email },
+        'Fallo al enviar el correo de solicitud de firma',
+      );
+    }
+
+    return { envio, emailSent, emailError };
+  }
+}
+
+export class GetEnvioFirmaByTokenUseCase {
+  constructor(private readonly repository: ContratoRepository) {}
+
+  async execute(token: string): Promise<{
+    envio: EnvioFirma;
+    contrato: ContratoCompleto;
+  }> {
+    const envio = await this.repository.findEnvioFirmaByToken(token);
+    if (!envio) throw new NotFoundError('Solicitud de firma');
+    const contrato = await this.repository.findById(envio.contratoId);
+    if (!contrato) throw new NotFoundError('Contrato');
+    return { envio, contrato };
+  }
+}
+
+export class FirmarEnvioUseCase {
+  constructor(private readonly repository: ContratoRepository) {}
+
+  async execute(token: string) {
+    const envio = await this.repository.findEnvioFirmaByToken(token);
+    if (!envio) throw new NotFoundError('Solicitud de firma');
+    if (envio.estado === 'FIRMADO') return envio;
+    return this.repository.markEnvioFirmaFirmado(envio.id);
   }
 }
 

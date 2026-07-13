@@ -146,7 +146,10 @@ export class ContratoController {
   // Envíos
   addEnvio = asyncHandler(async (req: Request, res: Response) => {
     const dto = req.body as EnvioFirmaDto;
-    const data = await this.addEnvioUseCase.execute({ ...dto, contratoId: req.params.id! });
+    const data = await this.addEnvioUseCase.execute({
+      ...dto,
+      contratoId: req.params.id!,
+    });
     res.status(201).json({ success: true, data });
   });
 

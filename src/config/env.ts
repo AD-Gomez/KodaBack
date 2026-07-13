@@ -28,6 +28,12 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
 
   DEMO_PASSWORD: z.string().default('KodaHouse2024!'),
+
+  // ============ Email (Brevo) ============
+  BREVO_API_KEY: z.string().min(1, 'BREVO_API_KEY es requerido para envío de correos').optional(),
+  EMAIL_FROM: z.string().email().default('legal@kodahouses.com'),
+  EMAIL_FROM_NAME: z.string().min(1).default('KodaHouse · Legal'),
+  FRONTEND_PUBLIC_URL: z.string().url().default('https://kodahouse.pages.dev'),
 });
 
 const parsed = envSchema.safeParse(process.env);

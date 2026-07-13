@@ -278,16 +278,19 @@ model Firma {
 }
 
 model EnvioFirma {
-  id         String        @id @default(uuid())
-  contratoId String        @map("contrato_id")
-  nombre     String
-  email      String
-  fechaEnvio DateTime      @map("fecha_envio") @default(now())
-  estado     EstadoFirma   @default(PENDIENTE)
+  id           String      @id @default(uuid())
+  contratoId   String      @map("contrato_id")
+  nombre       String
+  email        String
+  token        String      @unique @default(uuid())
+  fechaEnvio   DateTime    @map("fecha_envio") @default(now())
+  fechaFirmado DateTime?   @map("fecha_firmado")
+  estado       EstadoFirma @default(PENDIENTE)
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 
   @@index([contratoId])
+  @@index([token])
   @@map("envios_firma")
 }
 

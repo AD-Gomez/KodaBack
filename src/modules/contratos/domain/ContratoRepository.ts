@@ -35,7 +35,15 @@ export interface ContratoRepository {
   updateFirmaEstado(id: string, estado: EstadoFirma): Promise<Firma>;
   removeFirma(id: string): Promise<void>;
 
-  addEnvioFirma(data: { contratoId: string; nombre: string; email: string; estado?: EstadoFirma }): Promise<EnvioFirma>;
+  addEnvioFirma(data: {
+    contratoId: string;
+    nombre: string;
+    email: string;
+    token?: string;
+    estado?: EstadoFirma;
+  }): Promise<EnvioFirma>;
+  findEnvioFirmaByToken(token: string): Promise<EnvioFirma | null>;
+  markEnvioFirmaFirmado(id: string): Promise<EnvioFirma>;
   removeEnvioFirma(id: string): Promise<void>;
 
   addDocumento(data: { contratoId: string; nombre: string; tipo: string; url: string; fecha?: Date }): Promise<DocumentoContrato>;
