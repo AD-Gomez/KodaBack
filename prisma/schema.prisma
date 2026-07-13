@@ -237,7 +237,7 @@ model Contrato {
 }
 
 model PlantillaContrato {
-  id        String   @id @default("principal")
+  id        String   @id
   titulo    String   @default("Contrato de arrendamiento")
   contenido String   @default("") @db.Text
   clausulas String[] @default([])

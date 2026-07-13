@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { prisma } from '../../../config/database.js';
@@ -11,6 +12,10 @@ const plantillaContratoSchema = z.object({
   titulo: z.string().trim().min(3).max(160),
   contenido: z.string().max(20000),
   clausulas: z.array(z.string().trim().min(1).max(5000)).max(50),
+});
+
+const plantillaIdSchema = z.object({
+  id: z.string().trim().min(1).max(100),
 });
 
 const PLANTILLA_ID = 'principal';
@@ -30,6 +35,13 @@ export function createConfiguracionRouter(): Router {
     res.json({ success: true, data: plantilla ?? plantillaPorDefecto });
   }));
 
+  router.get('/contratos', asyncHandler(async (_req, res) => {
+    const plantillas = await prisma.plantillaContrato.findMany({
+      orderBy: [{ id: 'asc' }, { updatedAt: 'desc' }],
+    });
+    res.json({ success: true, data: plantillas.length ? plantillas : [plantillaPorDefecto] });
+  }));
+
   router.put('/contrato', requireRoles('ADMIN'), validate(plantillaContratoSchema), asyncHandler(async (req, res) => {
     const data = { ...req.body, contenido: sanitizeRichText(req.body.contenido) };
     const plantilla = await prisma.plantillaContrato.upsert({
@@ -38,6 +50,35 @@ export function createConfiguracionRouter(): Router {
       update: data,
     });
     res.json({ success: true, data: plantilla });
+  }));
+
+  router.post('/contratos', requireRoles('ADMIN'), validate(plantillaContratoSchema), asyncHandler(async (req, res) => {
+    const plantilla = await prisma.plantillaContrato.create({
+      data: {
+        id: randomUUID(),
+        ...req.body,
+        contenido: sanitizeRichText(req.body.contenido),
+      },
+    });
+    res.status(201).json({ success: true, data: plantilla });
+  }));
+
+  router.put('/contratos/:id', requireRoles('ADMIN'), validate(plantillaIdSchema, 'params'), validate(plantillaContratoSchema), asyncHandler(async (req, res) => {
+    const data = {
+      ...req.body,
+      contenido: sanitizeRichText(req.body.contenido),
+    };
+    const plantilla = await prisma.plantillaContrato.upsert({
+      where: { id: req.params.id },
+      create: { id: req.params.id, ...data },
+      update: data,
+    });
+    res.json({ success: true, data: plantilla });
+  }));
+
+  router.delete('/contratos/:id', requireRoles('ADMIN'), validate(plantillaIdSchema, 'params'), asyncHandler(async (req, res) => {
+    await prisma.plantillaContrato.delete({ where: { id: req.params.id } });
+    res.status(204).send();
   }));
 
   return router;
