@@ -29,15 +29,15 @@ export const idParamSchema = z.object({
 export const createDepartamentoSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(100),
   direccion: z.string().min(1, 'La dirección es requerida').max(255),
-  puntoReferencia: z.string().max(255).optional(),
+  puntoReferencia: z.string().max(255).nullable().optional(),
   montoCompra: decimalPositive,
   alquiler: decimalPositive,
   distribucion: z.string().min(1, 'La distribución es requerida'),
   inmobiliario: z.string().min(1, 'El inmobiliario es requerido'),
-  serviciosActivos: z.string().optional(),
+  serviciosActivos: z.string().nullable().optional(),
   renovacionContrato: dateString,
   estado: estadoEnum.optional().default('VACIO'),
-  imagen: z.string().optional(),
+  imagen: z.string().nullable().optional(),
 });
 
 export const updateDepartamentoSchema = createDepartamentoSchema.partial();

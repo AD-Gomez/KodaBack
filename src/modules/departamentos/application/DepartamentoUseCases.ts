@@ -37,15 +37,15 @@ export class GetDepartamentoUseCase {
 export interface CreateDepartamentoInput {
   nombre: string;
   direccion: string;
-  puntoReferencia?: string;
+  puntoReferencia?: string | null;
   montoCompra: number;
   alquiler: number;
   distribucion: string;
   inmobiliario: string;
-  serviciosActivos?: string;
+  serviciosActivos?: string | null;
   renovacionContrato?: string | null;
   estado?: string;
-  imagen?: string;
+  imagen?: string | null;
 }
 
 export class CreateDepartamentoUseCase {
