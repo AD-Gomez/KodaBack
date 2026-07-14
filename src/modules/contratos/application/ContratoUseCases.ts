@@ -306,11 +306,11 @@ export class GetEnvioFirmaByTokenUseCase {
 export class FirmarEnvioUseCase {
   constructor(private readonly repository: ContratoRepository) {}
 
-  async execute(token: string) {
+  async execute(token: string, data: { nombreLegal: string; firmaData: string }) {
     const envio = await this.repository.findEnvioFirmaByToken(token);
     if (!envio) throw new NotFoundError('Solicitud de firma');
-    if (envio.estado === 'FIRMADO') return envio;
-    return this.repository.markEnvioFirmaFirmado(envio.id);
+    if (envio.estado === 'FIRMADO' && envio.firmaData) return envio;
+    return this.repository.markEnvioFirmaFirmado(envio.id, data);
   }
 }
 

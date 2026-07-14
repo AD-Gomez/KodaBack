@@ -285,6 +285,8 @@ model EnvioFirma {
   token        String      @unique @default(uuid())
   fechaEnvio   DateTime    @map("fecha_envio") @default(now())
   fechaFirmado DateTime?   @map("fecha_firmado")
+  nombreLegal  String?     @map("nombre_legal")
+  firmaData    String?     @map("firma_data") @db.Text
   estado       EstadoFirma @default(PENDIENTE)
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)

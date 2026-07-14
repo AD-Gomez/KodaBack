@@ -43,7 +43,7 @@ export interface ContratoRepository {
     estado?: EstadoFirma;
   }): Promise<EnvioFirma>;
   findEnvioFirmaByToken(token: string): Promise<EnvioFirma | null>;
-  markEnvioFirmaFirmado(id: string): Promise<EnvioFirma>;
+  markEnvioFirmaFirmado(id: string, data: { nombreLegal: string; firmaData: string }): Promise<EnvioFirma>;
   removeEnvioFirma(id: string): Promise<void>;
 
   addDocumento(data: { contratoId: string; nombre: string; tipo: string; url: string; fecha?: Date }): Promise<DocumentoContrato>;

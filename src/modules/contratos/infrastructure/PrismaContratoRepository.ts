@@ -117,10 +117,15 @@ export class PrismaContratoRepository implements ContratoRepository {
     return this.prisma.envioFirma.findUnique({ where: { token } });
   }
 
-  async markEnvioFirmaFirmado(id: string): Promise<EnvioFirma> {
+  async markEnvioFirmaFirmado(id: string, data: { nombreLegal: string; firmaData: string }): Promise<EnvioFirma> {
     return this.prisma.envioFirma.update({
       where: { id },
-      data: { estado: 'FIRMADO', fechaFirmado: new Date() },
+      data: {
+        estado: 'FIRMADO',
+        fechaFirmado: new Date(),
+        nombreLegal: data.nombreLegal,
+        firmaData: data.firmaData,
+      },
     });
   }
 
