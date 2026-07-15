@@ -15,6 +15,20 @@ const dateString = z
 
 const estadoEnum = z.enum(['OCUPADO', 'VACIO', 'MANTENIMIENTO', 'RESERVADO']);
 
+const sheetUrl = z
+  .string()
+  .trim()
+  .url('La URL de Sheet no es válida')
+  .max(2000)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.hostname === 'docs.google.com' && url.pathname.startsWith('/spreadsheets/');
+    } catch {
+      return false;
+    }
+  }, 'Debe ser un enlace de Google Sheets');
+
 export const listDepartamentosQuerySchema = z.object({
   estado: estadoEnum.optional(),
   search: z.string().trim().optional(),
@@ -38,6 +52,7 @@ export const createDepartamentoSchema = z.object({
   renovacionContrato: dateString,
   estado: estadoEnum.optional().default('VACIO'),
   imagen: z.string().nullable().optional(),
+  sheet: sheetUrl.nullable().optional(),
 });
 
 export const updateDepartamentoSchema = createDepartamentoSchema.partial();

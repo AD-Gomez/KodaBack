@@ -46,6 +46,7 @@ export interface CreateDepartamentoInput {
   renovacionContrato?: string | null;
   estado?: string;
   imagen?: string | null;
+  sheet?: string | null;
 }
 
 export class CreateDepartamentoUseCase {
@@ -64,6 +65,7 @@ export class CreateDepartamentoUseCase {
       renovacionContrato: input.renovacionContrato ? new Date(input.renovacionContrato) : undefined,
       estado: input.estado as DepartamentoWithRelations['estado'] | undefined,
       imagen: input.imagen,
+      sheet: input.sheet,
     });
   }
 }
@@ -88,6 +90,7 @@ export class UpdateDepartamentoUseCase {
     }
     if (input.estado !== undefined) data.estado = input.estado;
     if (input.imagen !== undefined) data.imagen = input.imagen;
+    if (input.sheet !== undefined) data.sheet = input.sheet;
     return this.repository.update(id, data);
   }
 }

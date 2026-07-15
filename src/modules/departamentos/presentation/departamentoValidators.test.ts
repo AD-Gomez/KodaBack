@@ -36,4 +36,30 @@ describe('departamentoValidators', () => {
     };
     expect(() => createDepartamentoSchema.parse(input)).toThrow();
   });
+
+  it('debería aceptar un enlace directo de Google Sheets', () => {
+    const input = {
+      nombre: 'TEST',
+      direccion: 'Calle 1',
+      montoCompra: 1000,
+      alquiler: 100,
+      distribucion: '50m²',
+      inmobiliario: 'Nada',
+      sheet: 'https://docs.google.com/spreadsheets/d/example/edit?gid=123',
+    };
+    expect(() => createDepartamentoSchema.parse(input)).not.toThrow();
+  });
+
+  it('debería rechazar una URL que no sea de Google Sheets', () => {
+    const input = {
+      nombre: 'TEST',
+      direccion: 'Calle 1',
+      montoCompra: 1000,
+      alquiler: 100,
+      distribucion: '50m²',
+      inmobiliario: 'Nada',
+      sheet: 'https://example.com/archivo',
+    };
+    expect(() => createDepartamentoSchema.parse(input)).toThrow();
+  });
 });
