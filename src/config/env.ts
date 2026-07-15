@@ -36,8 +36,10 @@ const envSchema = z.object({
   FRONTEND_PUBLIC_URL: z.string().url().default('https://kodahouses.com'),
 
   // ============ AWS S3 (cédulas + PDFs firmados) ============
-  AWS_REGION: z.string().min(1).default('us-east-1'),
+  AWS_REGION: z.string().min(1).optional(),
   AWS_S3_BUCKET: z.string().min(1, 'AWS_S3_BUCKET es requerido para subir archivos').optional(),
+  AWS_S3_REGION_NAME: z.string().min(1).optional(),
+  AWS_STORAGE_BUCKET_NAME: z.string().min(1).optional(),
   AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
   AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   AWS_S3_PUBLIC_URL: z.string().url().optional(),

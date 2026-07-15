@@ -242,6 +242,17 @@ export interface AddEnvioFirmaResult {
   emailError?: string;
 }
 
+export interface ContractSignedNotifier {
+  notifyContractSigned(input: {
+    usuarioId: string;
+    envioId: string;
+    contratoId: string;
+    contratoTitulo?: string | null;
+    departamentoNombre?: string;
+    firmanteNombre: string;
+  }): Promise<void>;
+}
+
 export class AddEnvioFirmaUseCase {
   constructor(private readonly repository: ContratoRepository) {}
 
@@ -306,13 +317,40 @@ export class GetEnvioFirmaByTokenUseCase {
 }
 
 export class FirmarEnvioUseCase {
-  constructor(private readonly repository: ContratoRepository) {}
+  constructor(
+    private readonly repository: ContratoRepository,
+    private readonly notifier?: ContractSignedNotifier,
+  ) {}
 
   async execute(token: string, data: { nombreLegal: string; firmaData: string }) {
     const envio = await this.repository.findEnvioFirmaByToken(token);
     if (!envio) throw new NotFoundError('Solicitud de firma');
     if (envio.estado === 'FIRMADO' && envio.firmaData) return envio;
-    return this.repository.markEnvioFirmaFirmado(envio.id, data);
+
+    const contrato = await this.repository.findById(envio.contratoId);
+    if (!contrato) throw new NotFoundError('Contrato');
+
+    const firmado = await this.repository.markEnvioFirmaFirmado(envio.id, data);
+
+    if (this.notifier && contrato.creadoPorId) {
+      try {
+        await this.notifier.notifyContractSigned({
+          usuarioId: contrato.creadoPorId,
+          envioId: envio.id,
+          contratoId: contrato.id,
+          contratoTitulo: contrato.titulo,
+          departamentoNombre: contrato.departamento?.nombre,
+          firmanteNombre: data.nombreLegal,
+        });
+      } catch (err) {
+        logger.error(
+          { err, envioId: envio.id, contratoId: contrato.id },
+          'Fallo al crear la notificación de contrato firmado',
+        );
+      }
+    }
+
+    return firmado;
   }
 }
 

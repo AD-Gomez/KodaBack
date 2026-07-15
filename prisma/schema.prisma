@@ -134,8 +134,27 @@ model Usuario {
   reparaciones     Reparacion[]    @relation("ReparacionSolicitante")
   inspecciones     Inspeccion[]    @relation("InspeccionInspector")
   refreshTokens    RefreshToken[]
+  notificaciones   Notificacion[]
 
   @@map("usuarios")
+}
+
+model Notificacion {
+  id          String    @id @default(uuid())
+  usuarioId   String    @map("usuario_id")
+  tipo        String
+  titulo      String
+  descripcion String    @db.Text
+  enlace      String?
+  clave       String
+  leidaAt     DateTime? @map("leida_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, clave])
+  @@index([usuarioId, leidaAt, createdAt])
+  @@map("notificaciones")
 }
 
 model RefreshToken {

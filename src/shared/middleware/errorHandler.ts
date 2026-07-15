@@ -1,3 +1,4 @@
+import multer from 'multer';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
@@ -30,6 +31,20 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  if (err instanceof multer.MulterError) {
+    const isFileTooLarge = err.code === 'LIMIT_FILE_SIZE';
+    res.status(isFileTooLarge ? 413 : 400).json({
+      success: false,
+      error: {
+        code: 'UPLOAD_ERROR',
+        message: isFileTooLarge
+          ? 'La imagen supera el límite de 10 MB.'
+          : 'No se pudo procesar el archivo enviado.',
+      },
+    });
+    return;
+  }
+
   if (err instanceof ZodError) {
     const body: ErrorResponseBody = {
       success: false,

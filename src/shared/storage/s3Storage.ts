@@ -10,15 +10,24 @@ import { logger } from '../logger.js';
 
 let cachedClient: S3Client | null = null;
 
+function getBucket(): string | undefined {
+  return env.AWS_S3_BUCKET ?? env.AWS_STORAGE_BUCKET_NAME;
+}
+
+function getRegion(): string {
+  return env.AWS_REGION ?? env.AWS_S3_REGION_NAME ?? 'us-east-1';
+}
+
 function getClient(): S3Client {
   if (cachedClient) return cachedClient;
-  if (!env.AWS_S3_BUCKET || !env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
+  const bucket = getBucket();
+  if (!bucket || !env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
     throw new Error(
-      'S3 no está configurado. Define AWS_S3_BUCKET, AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY.',
+      'S3 no está configurado. Define el bucket, AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY.',
     );
   }
   cachedClient = new S3Client({
-    region: env.AWS_REGION,
+    region: getRegion(),
     credentials: {
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
@@ -28,14 +37,16 @@ function getClient(): S3Client {
 }
 
 function buildPublicUrl(key: string): string {
+  const bucket = getBucket();
+  const region = getRegion();
   if (env.AWS_S3_PUBLIC_URL) {
     const base = env.AWS_S3_PUBLIC_URL.replace(/\/+$/, '');
     return `${base}/${key}`;
   }
-  if (!env.AWS_S3_BUCKET) {
-    throw new Error('AWS_S3_BUCKET es requerido para construir la URL pública');
+  if (!bucket) {
+    throw new Error('El bucket de S3 es requerido para construir la URL pública');
   }
-  return `https://${env.AWS_S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
+  return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 }
 
 function guessContentType(filename: string, fallback = 'application/octet-stream'): string {
@@ -70,24 +81,32 @@ export async function uploadBuffer({ buffer, filename, contentType, prefix }: Up
 }> {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const key = `${prefix.replace(/\/+$/, '')}/${randomUUID()}-${safeName}`;
+  const bucket = getBucket();
+  if (!bucket) {
+    throw new Error('El bucket de S3 es requerido para subir archivos');
+  }
   const client = getClient();
   await client.send(
     new PutObjectCommand({
-      Bucket: env.AWS_S3_BUCKET!,
+      Bucket: bucket,
       Key: key,
       Body: buffer,
       ContentType: contentType ?? guessContentType(filename),
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
-  logger.info({ key, bucket: env.AWS_S3_BUCKET }, 'Archivo subido a S3');
+  logger.info({ key, bucket }, 'Archivo subido a S3');
   return { key, url: buildPublicUrl(key) };
 }
 
 export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const bucket = getBucket();
+  if (!bucket) {
+    throw new Error('El bucket de S3 es requerido para descargar archivos');
+  }
   const client = getClient();
   const res = await client.send(
-    new GetObjectCommand({ Bucket: env.AWS_S3_BUCKET!, Key: key }),
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
   );
   if (!res.Body) throw new Error(`S3 object ${key} sin body`);
   const chunks: Buffer[] = [];

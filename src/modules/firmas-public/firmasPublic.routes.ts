@@ -15,11 +15,17 @@ import {
   UploadCedulaEnvioUseCase,
 } from '../contratos/application/ContratoUseCases.js';
 import { PrismaContratoRepository } from '../contratos/infrastructure/PrismaContratoRepository.js';
+import { NotifyContractSignedUseCase } from '../notificaciones/application/NotificacionUseCases.js';
+import { PrismaNotificacionRepository } from '../notificaciones/infrastructure/PrismaNotificacionRepository.js';
 
 const publicRepo = new PrismaContratoRepository(prisma);
+const notificationRepo = new PrismaNotificacionRepository(prisma);
 
 const getEnvioUseCase = new GetEnvioFirmaByTokenUseCase(publicRepo);
-const firmarEnvioUseCase = new FirmarEnvioUseCase(publicRepo);
+const firmarEnvioUseCase = new FirmarEnvioUseCase(
+  publicRepo,
+  new NotifyContractSignedUseCase(notificationRepo),
+);
 const uploadCedulaUseCase = new UploadCedulaEnvioUseCase(publicRepo);
 const ensurePdfUseCase = new EnsureEnvioPdfUseCase(publicRepo);
 
