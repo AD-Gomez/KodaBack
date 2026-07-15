@@ -54,7 +54,7 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.departamento.count(),
       this.prisma.departamento.count({ where: { estado: 'OCUPADO' } }),
-      this.prisma.departamento.aggregate({ _sum: { alquiler: true }, where: { estado: 'OCUPADO' } }),
+      this.prisma.departamento.aggregate({ _sum: { alquiler: true } }),
       this.prisma.departamento.aggregate({ _sum: { montoCompra: true } }),
       this.prisma.arrendatario.count({ where: { estado: 'ACTIVO' } }),
       this.prisma.arrendatario.count({ where: { estado: 'MOROSO' } }),

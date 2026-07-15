@@ -129,6 +129,17 @@ export class PrismaContratoRepository implements ContratoRepository {
     });
   }
 
+  async updateEnvioFirmaCedula(
+    id: string,
+    data: { cedulaFrenteUrl?: string | null; cedulaReversoUrl?: string | null },
+  ): Promise<EnvioFirma> {
+    return this.prisma.envioFirma.update({ where: { id }, data });
+  }
+
+  async updateEnvioFirmaPdf(id: string, data: { pdfUrl: string; pdfGeneradoAt: Date }): Promise<EnvioFirma> {
+    return this.prisma.envioFirma.update({ where: { id }, data });
+  }
+
   async removeEnvioFirma(id: string): Promise<void> {
     await this.prisma.envioFirma.delete({ where: { id } });
   }

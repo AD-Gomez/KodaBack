@@ -16,6 +16,7 @@ import { createDashboardRouter } from './modules/dashboard/index.js';
 import { createDepartamentosRouter } from './modules/departamentos/index.js';
 import { createReparacionesRouter } from './modules/reparaciones/index.js';
 import { createFirmasPublicRouter } from './modules/firmas-public/firmasPublic.routes.js';
+import { createInspeccionesRouter } from './modules/inspecciones/index.js';
 
 export function createApp(): Application {
   const app = express();
@@ -62,6 +63,7 @@ export function createApp(): Application {
   apiRouter.use('/departamentos', createDepartamentosRouter());
   apiRouter.use('/arrendatarios', createArrendatariosRouter());
   apiRouter.use('/reparaciones', createReparacionesRouter());
+  apiRouter.use('/inspecciones', createInspeccionesRouter());
   apiRouter.use('/contratos', createContratosRouter());
   apiRouter.use('/configuracion', createConfiguracionRouter());
 

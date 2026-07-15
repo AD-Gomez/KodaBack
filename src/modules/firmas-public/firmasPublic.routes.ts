@@ -3,18 +3,25 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { prisma } from '../../config/database.js';
-import {
-  FirmarEnvioUseCase,
-  GetEnvioFirmaByTokenUseCase,
-} from '../contratos/application/ContratoUseCases.js';
-import { PrismaContratoRepository } from '../contratos/infrastructure/PrismaContratoRepository.js';
+import { cedulaUpload } from '../../shared/middleware/cedulaUpload.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { asyncHandler } from '../../shared/utils/asyncHandler.js';
+import { logger } from '../../shared/logger.js';
+
+import {
+  EnsureEnvioPdfUseCase,
+  FirmarEnvioUseCase,
+  GetEnvioFirmaByTokenUseCase,
+  UploadCedulaEnvioUseCase,
+} from '../contratos/application/ContratoUseCases.js';
+import { PrismaContratoRepository } from '../contratos/infrastructure/PrismaContratoRepository.js';
 
 const publicRepo = new PrismaContratoRepository(prisma);
 
 const getEnvioUseCase = new GetEnvioFirmaByTokenUseCase(publicRepo);
 const firmarEnvioUseCase = new FirmarEnvioUseCase(publicRepo);
+const uploadCedulaUseCase = new UploadCedulaEnvioUseCase(publicRepo);
+const ensurePdfUseCase = new EnsureEnvioPdfUseCase(publicRepo);
 
 const firmaPublicaSchema = z.object({
   nombreLegal: z.string().trim().min(3).max(160),
@@ -54,6 +61,9 @@ export function createFirmasPublicRouter(): Router {
             fechaFirmado: envio.fechaFirmado,
             nombreLegal: envio.nombreLegal,
             firmaData: envio.firmaData,
+            cedulaFrenteUrl: envio.cedulaFrenteUrl,
+            cedulaReversoUrl: envio.cedulaReversoUrl,
+            pdfUrl: envio.pdfUrl,
           },
           contrato: {
             id: contrato.id,
@@ -67,6 +77,37 @@ export function createFirmasPublicRouter(): Router {
           },
         },
       });
+    }),
+  );
+
+  router.post(
+    '/firmas/:token/cedula',
+    cedulaUpload.fields([
+      { name: 'frente', maxCount: 1 },
+      { name: 'reverso', maxCount: 1 },
+    ]),
+    asyncHandler(async (req: Request, res: Response) => {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+      const frente = files?.frente?.[0];
+      const reverso = files?.reverso?.[0];
+
+      try {
+        const envio = await uploadCedulaUseCase.execute(req.params.token!, {
+          frente,
+          reverso,
+        });
+        res.json({
+          success: true,
+          data: {
+            id: envio.id,
+            cedulaFrenteUrl: envio.cedulaFrenteUrl,
+            cedulaReversoUrl: envio.cedulaReversoUrl,
+          },
+        });
+      } catch (err) {
+        logger.error({ err, token: req.params.token }, 'Error subiendo cédula');
+        throw err;
+      }
     }),
   );
 
@@ -86,6 +127,22 @@ export function createFirmasPublicRouter(): Router {
           estado: envio.estado,
           fechaFirmado: envio.fechaFirmado,
           nombreLegal: envio.nombreLegal,
+          cedulaFrenteUrl: envio.cedulaFrenteUrl,
+          cedulaReversoUrl: envio.cedulaReversoUrl,
+        },
+      });
+    }),
+  );
+
+  router.post(
+    '/firmas/:token/pdf',
+    asyncHandler(async (req: Request, res: Response) => {
+      const result = await ensurePdfUseCase.execute(req.params.token!);
+      res.json({
+        success: true,
+        data: {
+          pdfUrl: result.pdfUrl,
+          generated: result.generated,
         },
       });
     }),

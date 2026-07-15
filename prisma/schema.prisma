@@ -100,6 +100,24 @@ enum EstadoServicio {
   CANCELADO
 }
 
+enum TipoInspeccion {
+  ENTRADA
+  SALIDA
+  RUTINA
+}
+
+enum EstadoInspeccion {
+  EN_CURSO
+  COMPLETADA
+}
+
+enum CondicionInspeccion {
+  SIN_REVISAR
+  BIEN
+  OBSERVACION
+  DANO
+}
+
 // =================== MODELS ===================
 
 model Usuario {
@@ -114,6 +132,7 @@ model Usuario {
 
   contratosCreados Contrato[]      @relation("ContratoCreadoPor")
   reparaciones     Reparacion[]    @relation("ReparacionSolicitante")
+  inspecciones     Inspeccion[]    @relation("InspeccionInspector")
   refreshTokens    RefreshToken[]
 
   @@map("usuarios")
@@ -153,9 +172,65 @@ model Departamento {
   contratos      Contrato[]
   reparaciones   Reparacion[]
   servicios      ServicioActivo[]
+  inspecciones   Inspeccion[]
 
   @@index([estado])
   @@map("departamentos")
+}
+
+model Inspeccion {
+  id             String           @id @default(uuid())
+  departamentoId String           @map("departamento_id")
+  inspectorId    String           @map("inspector_id")
+  tipo           TipoInspeccion
+  estado         EstadoInspeccion @default(EN_CURSO)
+  notasGenerales String?          @map("notas_generales")
+  completadaAt   DateTime?        @map("completada_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  departamento Departamento         @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  inspector    Usuario              @relation("InspeccionInspector", fields: [inspectorId], references: [id])
+  ambientes    AmbienteInspeccion[]
+
+  @@index([departamentoId])
+  @@index([inspectorId])
+  @@index([estado])
+  @@map("inspecciones")
+}
+
+model AmbienteInspeccion {
+  id            String              @id @default(uuid())
+  inspeccionId  String              @map("inspeccion_id")
+  nombre        String
+  orden         Int
+  requerido     Boolean             @default(true)
+  condicion     CondicionInspeccion @default(SIN_REVISAR)
+  observaciones String?
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  inspeccion Inspeccion       @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  fotos      FotoInspeccion[]
+
+  @@unique([inspeccionId, nombre])
+  @@index([inspeccionId])
+  @@map("ambientes_inspeccion")
+}
+
+model FotoInspeccion {
+  id            String   @id @default(uuid())
+  ambienteId    String   @map("ambiente_id")
+  nombreArchivo String   @map("nombre_archivo")
+  mimeType      String   @map("mime_type")
+  datos         String   @db.Text
+  observacion   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  ambiente AmbienteInspeccion @relation(fields: [ambienteId], references: [id], onDelete: Cascade)
+
+  @@index([ambienteId])
+  @@map("fotos_inspeccion")
 }
 
 model Arrendatario {
@@ -287,7 +362,11 @@ model EnvioFirma {
   fechaFirmado DateTime?   @map("fecha_firmado")
   nombreLegal  String?     @map("nombre_legal")
   firmaData    String?     @map("firma_data") @db.Text
-  estado       EstadoFirma @default(PENDIENTE)
+  cedulaFrenteUrl  String?     @map("cedula_frente_url")
+  cedulaReversoUrl String?     @map("cedula_reverso_url")
+  pdfUrl           String?     @map("pdf_url")
+  pdfGeneradoAt    DateTime?   @map("pdf_generado_at")
+  estado           EstadoFirma @default(PENDIENTE)
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 

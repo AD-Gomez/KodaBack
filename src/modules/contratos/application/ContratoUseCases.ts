@@ -2,6 +2,8 @@ import { ConflictError, NotFoundError, ValidationError } from '../../../shared/e
 import { emailService } from '../../../shared/email/BrevoEmailService.js';
 import { buildSignatureEmail } from '../../../shared/email/templates/signatureEmail.js';
 import { logger } from '../../../shared/logger.js';
+import { buildSignedContractPdf } from '../../../shared/pdf/contractPdf.js';
+import { uploadBuffer } from '../../../shared/storage/s3Storage.js';
 import { sanitizeRichText } from '../../../shared/utils/sanitizeRichText.js';
 
 import type {
@@ -311,6 +313,108 @@ export class FirmarEnvioUseCase {
     if (!envio) throw new NotFoundError('Solicitud de firma');
     if (envio.estado === 'FIRMADO' && envio.firmaData) return envio;
     return this.repository.markEnvioFirmaFirmado(envio.id, data);
+  }
+}
+
+export class UploadCedulaEnvioUseCase {
+  constructor(private readonly repository: ContratoRepository) {}
+
+  async execute(
+    token: string,
+    files: { frente?: Express.Multer.File | undefined; reverso?: Express.Multer.File | undefined },
+  ): Promise<EnvioFirma> {
+    if (!files.frente && !files.reverso) {
+      throw new ValidationError('Debes enviar al menos una foto de la cédula (frente o reverso).');
+    }
+
+    const envio = await this.repository.findEnvioFirmaByToken(token);
+    if (!envio) throw new NotFoundError('Solicitud de firma');
+
+    let cedulaFrenteUrl = envio.cedulaFrenteUrl;
+    let cedulaReversoUrl = envio.cedulaReversoUrl;
+
+    if (files.frente) {
+      const { url } = await uploadBuffer({
+        buffer: files.frente.buffer,
+        filename: files.frente.originalname || 'cedula-frente.jpg',
+        contentType: files.frente.mimetype,
+        prefix: `firmas/${envio.contratoId}/${envio.id}/cedula`,
+      });
+      cedulaFrenteUrl = url;
+    }
+
+    if (files.reverso) {
+      const { url } = await uploadBuffer({
+        buffer: files.reverso.buffer,
+        filename: files.reverso.originalname || 'cedula-reverso.jpg',
+        contentType: files.reverso.mimetype,
+        prefix: `firmas/${envio.contratoId}/${envio.id}/cedula`,
+      });
+      cedulaReversoUrl = url;
+    }
+
+    return this.repository.updateEnvioFirmaCedula(envio.id, {
+      cedulaFrenteUrl,
+      cedulaReversoUrl,
+    });
+  }
+}
+
+export interface EnsurePdfResult {
+  envio: EnvioFirma;
+  pdfUrl: string;
+  generated: boolean;
+}
+
+export class EnsureEnvioPdfUseCase {
+  constructor(private readonly repository: ContratoRepository) {}
+
+  async execute(token: string): Promise<EnsurePdfResult> {
+    const envio = await this.repository.findEnvioFirmaByToken(token);
+    if (!envio) throw new NotFoundError('Solicitud de firma');
+    if (envio.estado !== 'FIRMADO' || !envio.firmaData || !envio.fechaFirmado) {
+      throw new ValidationError('La solicitud aún no ha sido firmada.');
+    }
+    if (!envio.nombreLegal) {
+      throw new ValidationError('Falta el nombre legal del firmante.');
+    }
+
+    if (envio.pdfUrl) {
+      return { envio, pdfUrl: envio.pdfUrl, generated: false };
+    }
+
+    const contrato = await this.repository.findById(envio.contratoId);
+    if (!contrato) throw new NotFoundError('Contrato');
+
+    const pdfBuffer = await buildSignedContractPdf({
+      contractId: contrato.id,
+      contractTitulo: contrato.titulo ?? `Contrato · ${contrato.departamento?.nombre ?? ''}`,
+      departamentoNombre: contrato.departamento?.nombre ?? '—',
+      departamentoDireccion: contrato.departamento?.direccion ?? '',
+      arrendatarioNombre: contrato.arrendatario?.nombre ?? envio.nombre,
+      fechaInicio: new Date(contrato.fechaInicio),
+      fechaFin: new Date(contrato.fechaFin),
+      fechaFirmado: new Date(envio.fechaFirmado),
+      nombreLegal: envio.nombreLegal,
+      firmaDataUrl: envio.firmaData,
+      cedulaFrenteUrl: envio.cedulaFrenteUrl,
+      cedulaReversoUrl: envio.cedulaReversoUrl,
+      version: contrato.version,
+    });
+
+    const { url } = await uploadBuffer({
+      buffer: pdfBuffer,
+      filename: `contrato-${contrato.id.slice(0, 8)}-firmado.pdf`,
+      contentType: 'application/pdf',
+      prefix: `firmas/${contrato.id}/${envio.id}/pdf`,
+    });
+
+    const updated = await this.repository.updateEnvioFirmaPdf(envio.id, {
+      pdfUrl: url,
+      pdfGeneradoAt: new Date(),
+    });
+
+    return { envio: updated, pdfUrl: url, generated: true };
   }
 }
 

@@ -44,6 +44,8 @@ export interface ContratoRepository {
   }): Promise<EnvioFirma>;
   findEnvioFirmaByToken(token: string): Promise<EnvioFirma | null>;
   markEnvioFirmaFirmado(id: string, data: { nombreLegal: string; firmaData: string }): Promise<EnvioFirma>;
+  updateEnvioFirmaCedula(id: string, data: { cedulaFrenteUrl?: string | null; cedulaReversoUrl?: string | null }): Promise<EnvioFirma>;
+  updateEnvioFirmaPdf(id: string, data: { pdfUrl: string; pdfGeneradoAt: Date }): Promise<EnvioFirma>;
   removeEnvioFirma(id: string): Promise<void>;
 
   addDocumento(data: { contratoId: string; nombre: string; tipo: string; url: string; fecha?: Date }): Promise<DocumentoContrato>;
