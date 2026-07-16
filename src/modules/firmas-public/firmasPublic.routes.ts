@@ -19,6 +19,20 @@ import { PrismaContratoRepository } from '../contratos/infrastructure/PrismaCont
 import { NotifyContractSignedUseCase } from '../notificaciones/application/NotificacionUseCases.js';
 import { PrismaNotificacionRepository } from '../notificaciones/infrastructure/PrismaNotificacionRepository.js';
 
+function getRequestIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0]!.trim();
+  }
+  return req.ip ?? req.socket.remoteAddress ?? '';
+}
+
+function getRequestUserAgent(req: Request): string {
+  const value = req.headers['user-agent'];
+  if (typeof value === 'string') return value.slice(0, 500);
+  return '';
+}
+
 const publicRepo = new PrismaContratoRepository(prisma);
 const notificationRepo = new PrismaNotificacionRepository(prisma);
 
@@ -144,6 +158,8 @@ export function createFirmasPublicRouter(): Router {
       const envio = await firmarEnvioUseCase.execute(req.params.token!, {
         nombreLegal: input.nombreLegal,
         firmaData: input.firma,
+        ip: getRequestIp(req),
+        userAgent: getRequestUserAgent(req),
       });
       const publicEnvio = await signEnvioStorageUrls(envio);
       res.json({

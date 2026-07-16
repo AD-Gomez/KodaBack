@@ -384,6 +384,8 @@ model EnvioFirma {
   cedulaReversoUrl String?     @map("cedula_reverso_url")
   pdfUrl           String?     @map("pdf_url")
   pdfGeneradoAt    DateTime?   @map("pdf_generado_at")
+  ipFirmado        String?     @map("ip_firmado")
+  userAgent        String?     @map("user_agent")
   estado           EstadoFirma @default(PENDIENTE)
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)

@@ -319,7 +319,10 @@ export class FirmarEnvioUseCase {
     private readonly notifier?: ContractSignedNotifier,
   ) {}
 
-  async execute(token: string, data: { nombreLegal: string; firmaData: string }) {
+  async execute(
+    token: string,
+    data: { nombreLegal: string; firmaData: string; ip?: string | null; userAgent?: string | null },
+  ) {
     const envio = await this.repository.findEnvioFirmaByToken(token);
     if (!envio) throw new NotFoundError('Solicitud de firma');
     if (envio.estado === 'FIRMADO' && envio.firmaData) return envio;
@@ -434,6 +437,9 @@ export class EnsureEnvioPdfUseCase {
       firmaDataUrl: envio.firmaData,
       cedulaFrenteUrl: envio.cedulaFrenteUrl,
       cedulaReversoUrl: envio.cedulaReversoUrl,
+      contenido: contrato.contenido ?? '',
+      ipFirmado: envio.ipFirmado ?? null,
+      userAgent: envio.userAgent ?? null,
       version: contrato.version,
     });
 

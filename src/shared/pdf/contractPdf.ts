@@ -18,6 +18,9 @@ export interface CedulaPdfInput {
   firmaDataUrl: string;
   cedulaFrenteUrl?: string | null;
   cedulaReversoUrl?: string | null;
+  contenido?: string | null;
+  ipFirmado?: string | null;
+  userAgent?: string | null;
   version: number;
 }
 
@@ -62,6 +65,264 @@ function formatDateTime(d: Date): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+type InlineFormat = { bold: boolean; italic: boolean; underline: boolean };
+
+const DEFAULT_FORMAT: InlineFormat = { bold: false, italic: false, underline: false };
+
+const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'blockquote']);
+const HEADING_TAGS = new Set(['h1', 'h2', 'h3']);
+
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_m, code: string) => {
+      const n = Number(code);
+      return Number.isFinite(n) ? String.fromCharCode(n) : '';
+    });
+}
+
+function chooseFont(format: InlineFormat, boldFont: string, italicFont: string): string {
+  if (format.bold && format.italic) return 'Helvetica-BoldOblique';
+  if (format.bold) return boldFont;
+  if (format.italic) return italicFont;
+  return 'Helvetica';
+}
+
+function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
+  const text = decodeEntities(html).replace(/\r\n/g, '\n');
+  const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
+  const tagStack: string[] = [];
+  const formatStack: InlineFormat[] = [DEFAULT_FORMAT];
+  let buffer = '';
+  let listIndex = 0;
+
+  const currentFormat = (): InlineFormat => formatStack[formatStack.length - 1] ?? DEFAULT_FORMAT;
+  const inList = (): 'ul' | 'ol' | null => {
+    for (let i = tagStack.length - 1; i >= 0; i--) {
+      const tag = tagStack[i];
+      if (tag === 'ul' || tag === 'ol') return tag;
+      if (BLOCK_TAGS.has(tag ?? '')) return null;
+    }
+    return null;
+  };
+
+  const flushParagraph = (blockTag: string | null) => {
+    const trimmed = buffer.replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+    buffer = '';
+    if (!trimmed) return;
+
+    const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
+    const baseSize = headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
+    const isBlockquote = blockTag === 'blockquote';
+    const listType = inList();
+
+    if (headingTag) doc.moveDown(0.4);
+    else if (isBlockquote) doc.moveDown(0.2);
+    else if (blockTag) doc.moveDown(0.25);
+
+    let indent = doc.page.margins.left;
+    let widthOffset = 0;
+    if (isBlockquote) {
+      indent += 18;
+      widthOffset = -18;
+    }
+
+    if (listType) {
+      listIndex += 1;
+      const marker = listType === 'ol' ? `${listIndex}.` : '•';
+      doc
+        .font('Helvetica')
+        .fontSize(baseSize)
+        .fillColor('#1e293b')
+        .text(marker, indent, doc.y, { continued: true, width: 12 });
+      indent += 14;
+    }
+
+    const lines = trimmed.split('\n');
+    lines.forEach((line, lineIdx) => {
+      if (!line) {
+        doc.moveDown(0.3);
+        return;
+      }
+      const segments = parseInlineSegments(line);
+      const isLastLine = lineIdx === lines.length - 1;
+      let first = true;
+      for (const segment of segments) {
+        const font = chooseFont(
+          segment.format,
+          headingTag ? 'Helvetica-Bold' : 'Helvetica-Bold',
+          'Helvetica-Oblique',
+        );
+        doc
+          .font(font)
+          .fontSize(baseSize)
+          .fillColor(isBlockquote ? '#475569' : '#1e293b');
+        doc.text(segment.text, indent, doc.y, {
+          continued: !first || !isLastLine || segments.length > 1,
+          width: doc.page.width - doc.page.margins.right - indent + widthOffset,
+          underline: segment.format.underline,
+        });
+        first = false;
+      }
+    });
+
+    doc.moveDown(0.4);
+  };
+
+  const flushListItem = () => {
+    flushParagraph('li');
+  };
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  tagPattern.lastIndex = 0;
+  while ((match = tagPattern.exec(text)) !== null) {
+    const matchStart = match.index;
+    const between = text.slice(lastIndex, matchStart);
+    if (between) buffer += between;
+    const closing = match[1] === '/';
+    const rawTag = (match[2] ?? '').toLowerCase();
+    lastIndex = tagPattern.lastIndex;
+
+    if (rawTag === 'br') {
+      buffer += '\n';
+      continue;
+    }
+
+    if (BLOCK_TAGS.has(rawTag) || rawTag === 'li' || rawTag === 'div') {
+      if (!closing) {
+        if (rawTag === 'ul' || rawTag === 'ol') {
+          listIndex = 0;
+          flushParagraph('p');
+          tagStack.push(rawTag);
+        } else if (rawTag === 'li') {
+          flushListItem();
+          tagStack.push('li');
+        } else {
+          const top = tagStack[tagStack.length - 1];
+          if (top === 'li') {
+            tagStack.pop();
+            flushListItem();
+          }
+          if (rawTag === 'p' && buffer.trim() === '') continue;
+          flushParagraph(rawTag);
+          tagStack.push(rawTag);
+        }
+      } else {
+        const top = tagStack[tagStack.length - 1];
+        if (top === rawTag) {
+          if (rawTag === 'li') {
+            tagStack.pop();
+            flushListItem();
+          } else {
+            tagStack.pop();
+          }
+        }
+      }
+      continue;
+    }
+
+    if (rawTag === 'strong' || rawTag === 'b') {
+      if (closing) {
+        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, bold: true });
+        if (idx > 0) formatStack.splice(idx, 1);
+      } else {
+        formatStack.push({ ...currentFormat(), bold: true });
+      }
+      continue;
+    }
+    if (rawTag === 'em' || rawTag === 'i') {
+      if (closing) {
+        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, italic: true });
+        if (idx > 0) formatStack.splice(idx, 1);
+      } else {
+        formatStack.push({ ...currentFormat(), italic: true });
+      }
+      continue;
+    }
+    if (rawTag === 'u') {
+      if (closing) {
+        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, underline: true });
+        if (idx > 0) formatStack.splice(idx, 1);
+      } else {
+        formatStack.push({ ...currentFormat(), underline: true });
+      }
+      continue;
+    }
+  }
+
+  const tail = text.slice(lastIndex);
+  if (tail) buffer += tail;
+  flushParagraph(null);
+}
+
+function parseInlineSegments(line: string): Array<{ text: string; format: InlineFormat }> {
+  const segments: Array<{ text: string; format: InlineFormat }> = [];
+  const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
+  const formatStack: InlineFormat[] = [DEFAULT_FORMAT];
+  let buffer = '';
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  const currentFormat = (): InlineFormat => formatStack[formatStack.length - 1] ?? DEFAULT_FORMAT;
+
+  const flush = () => {
+    if (buffer) {
+      segments.push({ text: buffer, format: { ...currentFormat() } });
+      buffer = '';
+    }
+  };
+
+  while ((match = tagPattern.exec(line)) !== null) {
+    const between = line.slice(lastIndex, match.index);
+    if (between) buffer += between;
+    const closing = match[1] === '/';
+    const tag = (match[2] ?? '').toLowerCase();
+    lastIndex = tagPattern.lastIndex;
+
+    if (tag === 'br') {
+      buffer += '\n';
+      continue;
+    }
+    if (tag === 'strong' || tag === 'b') {
+      flush();
+      if (!closing) formatStack.push({ ...currentFormat(), bold: true });
+      else formatStack.pop();
+      continue;
+    }
+    if (tag === 'em' || tag === 'i') {
+      flush();
+      if (!closing) formatStack.push({ ...currentFormat(), italic: true });
+      else formatStack.pop();
+      continue;
+    }
+    if (tag === 'u') {
+      flush();
+      if (!closing) formatStack.push({ ...currentFormat(), underline: true });
+      else formatStack.pop();
+      continue;
+    }
+    // Block tags shouldn't appear inline, but skip them defensively
+    flush();
+    if (!closing) formatStack.push({ ...currentFormat() });
+    else formatStack.pop();
+  }
+
+  const tail = line.slice(lastIndex);
+  if (tail) buffer += tail;
+  flush();
+
+  if (segments.length === 0) {
+    segments.push({ text: line, format: { ...DEFAULT_FORMAT } });
+  }
+  return segments;
 }
 
 export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buffer> {
@@ -132,12 +393,26 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   doc.y = startY + 4 * lineHeight * 2.2 + 6;
   doc.moveDown(1);
 
+  // --- Texto del contrato aceptado ---
+  if (input.contenido && input.contenido.trim()) {
+    doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Contrato aceptado');
+    doc.moveDown(0.3);
+    doc.fontSize(9).fillColor('#64748b').font('Helvetica').text(
+      'A continuación se reproduce el contenido íntegro del contrato que el firmante declara aceptar al firmar:',
+    );
+    doc.moveDown(0.4);
+    renderContractContent(doc, input.contenido);
+    doc.moveDown(0.5);
+  }
+
   // --- Bloque de firma ---
   doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Firma electrónica');
   doc.moveDown(0.3);
   doc.fontSize(11).fillColor('#1e293b').font('Helvetica');
   doc.text(`Firmante legal: ${input.nombreLegal}`);
   doc.text(`Fecha de firma: ${formatDateTime(input.fechaFirmado)}`);
+  if (input.ipFirmado) doc.text(`IP del firmante: ${input.ipFirmado}`);
+  if (input.userAgent) doc.text(`Navegador / dispositivo: ${input.userAgent}`);
   doc.moveDown(0.5);
 
   const firmaBuf = parseDataUrl(input.firmaDataUrl);
