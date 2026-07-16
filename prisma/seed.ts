@@ -186,8 +186,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👤',
       notas: 'Inquilino puntual. Buen trato con los vecinos.',
-      fechaExpedicion: d(10, 4, 2020),
-      fechaVencimiento: d(10, 4, 2030),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: 'V-17.998.715',
     },
     {
       nombre: 'WINDA ROSMARY FEBRES PINTO',
@@ -203,8 +203,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👩',
       notas: 'Pago puntual. Excelente inquilina.',
-      fechaExpedicion: d(15, 7, 2021),
-      fechaVencimiento: d(15, 7, 2031),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: '28.274.639',
     },
     {
       nombre: 'MARIA JOSE AGUILERA COVA',
@@ -220,8 +220,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👩‍💼',
       notas: 'Inquilina excelente. Recomendada.',
-      fechaExpedicion: d(20, 0, 2022),
-      fechaVencimiento: d(20, 0, 2032),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: 'V-25.355.885',
     },
     {
       nombre: 'LUIS FERNANDO CAMARA CASTILLO',
@@ -237,8 +237,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👨',
       notas: 'Inquilino responsable. Paga puntualmente.',
-      fechaExpedicion: d(20, 2, 2020),
-      fechaVencimiento: d(20, 2, 2030),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: 'V-26.987.332',
     },
     {
       nombre: 'CAMILA ALEXANDRA GONZALEZ PETTI',
@@ -254,8 +254,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👩',
       notas: 'Inquilina responsable.',
-      fechaExpedicion: d(15, 5, 2021),
-      fechaVencimiento: d(15, 5, 2031),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: '27.783.586',
     },
     {
       nombre: 'FABIOLA VALENTINA RODRIGUEZ CABELLO',
@@ -271,8 +271,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👩‍💼',
       notas: 'Contrato vigente. Buena inquilina.',
-      fechaExpedicion: d(25, 10, 2022),
-      fechaVencimiento: d(25, 10, 2032),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: 'V-30.487.816',
     },
     {
       nombre: 'BARBARA ANDREINA HERNANDEZ TORRES',
@@ -288,8 +288,8 @@ async function main(): Promise<void> {
       historialPagos: '✅ Al día',
       avatar: '👩',
       notas: 'Inquilina responsable.',
-      fechaExpedicion: d(25, 10, 2019),
-      fechaVencimiento: d(25, 10, 2029),
+      tipoIdentidad: 'Cédula',
+      numeroIdentidad: 'V-20.362.878',
     },
   ];
 

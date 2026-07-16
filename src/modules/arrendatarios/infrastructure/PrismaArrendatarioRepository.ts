@@ -32,6 +32,7 @@ export class PrismaArrendatarioRepository implements ArrendatarioRepository {
       where.OR = [
         { nombre: { contains: filters.search, mode: 'insensitive' } },
         { email: { contains: filters.search, mode: 'insensitive' } },
+        { numeroIdentidad: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
     return where;
