@@ -3,6 +3,7 @@ import axios from 'axios';
 import sharp from 'sharp';
 
 import { logger } from '../logger.js';
+import { getObjectBuffer, getObjectKey } from '../storage/s3Storage.js';
 
 export interface CedulaPdfInput {
   contractId: string;
@@ -20,16 +21,21 @@ export interface CedulaPdfInput {
   version: number;
 }
 
-async function fetchAsPngBuffer(url: string): Promise<Buffer | null> {
+async function fetchAsPngBuffer(reference: string): Promise<Buffer | null> {
   try {
-    const res = await axios.get<ArrayBuffer>(url, {
-      responseType: 'arraybuffer',
-      timeout: 15_000,
-    });
-    const raw = Buffer.from(res.data);
+    const raw = getObjectKey(reference)
+      ? await getObjectBuffer(reference)
+      : Buffer.from(
+          (
+            await axios.get<ArrayBuffer>(reference, {
+              responseType: 'arraybuffer',
+              timeout: 15_000,
+            })
+          ).data,
+        );
     return sharp(raw).rotate().png().toBuffer();
   } catch (err) {
-    logger.warn({ err, url }, 'No se pudo descargar la imagen para el PDF');
+    logger.warn({ err, reference }, 'No se pudo descargar la imagen para el PDF');
     return null;
   }
 }
@@ -73,11 +79,7 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   doc.on('data', (chunk) => chunks.push(chunk as Buffer));
 
   // --- Encabezado ---
-  doc
-    .fillColor('#0f172a')
-    .fontSize(20)
-    .font('Helvetica-Bold')
-    .text('KodaHouse', { align: 'left' });
+  doc.fillColor('#0f172a').fontSize(20).font('Helvetica-Bold').text('KodaHouse', { align: 'left' });
   doc
     .fontSize(9)
     .fillColor('#64748b')
@@ -106,8 +108,16 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   function pair(label: string, value: string, row: number, col: 0 | 1) {
     const x = doc.page.margins.left + col * colWidth;
     const y = startY + row * lineHeight * 2.2;
-    doc.font(labelFont).fontSize(9).fillColor('#64748b').text(label.toUpperCase(), x, y, { width: colWidth - 8 });
-    doc.font(valueFont).fontSize(11).fillColor('#0f172a').text(value || '—', x, y + 12, { width: colWidth - 8 });
+    doc
+      .font(labelFont)
+      .fontSize(9)
+      .fillColor('#64748b')
+      .text(label.toUpperCase(), x, y, { width: colWidth - 8 });
+    doc
+      .font(valueFont)
+      .fontSize(11)
+      .fillColor('#0f172a')
+      .text(value || '—', x, y + 12, { width: colWidth - 8 });
   }
 
   pair('Título', input.contractTitulo || `Contrato de arrendamiento`, 0, 0);
@@ -159,8 +169,10 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   doc.moveDown(0.6);
 
   const cedulaImgs: Array<{ url: string; label: string }> = [];
-  if (input.cedulaFrenteUrl) cedulaImgs.push({ url: input.cedulaFrenteUrl, label: 'Cédula · Frente' });
-  if (input.cedulaReversoUrl) cedulaImgs.push({ url: input.cedulaReversoUrl, label: 'Cédula · Reverso' });
+  if (input.cedulaFrenteUrl)
+    cedulaImgs.push({ url: input.cedulaFrenteUrl, label: 'Cédula · Frente' });
+  if (input.cedulaReversoUrl)
+    cedulaImgs.push({ url: input.cedulaReversoUrl, label: 'Cédula · Reverso' });
 
   if (cedulaImgs.length === 0) {
     doc.fillColor('#94a3b8').font('Helvetica-Oblique').text('Sin fotografías cargadas.');
@@ -181,19 +193,22 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
       const png = await fetchAsPngBuffer(slot.url);
       if (png) {
         try {
-          doc.image(png, x, y, { width: imgW, height: imgH, fit: [imgW, imgH], align: 'center', valign: 'center' });
+          doc.image(png, x, y, {
+            width: imgW,
+            height: imgH,
+            fit: [imgW, imgH],
+            align: 'center',
+            valign: 'center',
+          });
         } catch (err) {
           logger.warn({ err, url: slot.url }, 'No se pudo incrustar la imagen de cédula en el PDF');
         }
       } else {
+        doc.save().lineWidth(1).strokeColor('#cbd5e1').rect(x, y, imgW, imgH).stroke().restore();
         doc
-          .save()
-          .lineWidth(1)
-          .strokeColor('#cbd5e1')
-          .rect(x, y, imgW, imgH)
-          .stroke()
-          .restore();
-        doc.fillColor('#94a3b8').fontSize(10).text('Imagen no disponible', x + 8, y + imgH / 2 - 6, { width: imgW - 16 });
+          .fillColor('#94a3b8')
+          .fontSize(10)
+          .text('Imagen no disponible', x + 8, y + imgH / 2 - 6, { width: imgW - 16 });
       }
       doc
         .fontSize(9)

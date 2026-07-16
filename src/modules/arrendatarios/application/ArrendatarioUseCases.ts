@@ -17,8 +17,6 @@ export interface CreateArrendatarioInput {
   historialPagos?: string;
   avatar?: string;
   notas?: string;
-  tipoIdentidad: string;
-  numeroIdentidad: string;
   fechaExpedicion: string;
   fechaVencimiento: string;
 }
@@ -81,8 +79,6 @@ export class CreateArrendatarioUseCase {
       historialPagos: input.historialPagos,
       avatar: input.avatar,
       notas: input.notas,
-      tipoIdentidad: input.tipoIdentidad,
-      numeroIdentidad: input.numeroIdentidad,
       fechaExpedicion: new Date(input.fechaExpedicion),
       fechaVencimiento: new Date(input.fechaVencimiento),
     });
@@ -106,8 +102,6 @@ export class UpdateArrendatarioUseCase {
     if (input.historialPagos !== undefined) data.historialPagos = input.historialPagos;
     if (input.avatar !== undefined) data.avatar = input.avatar;
     if (input.notas !== undefined) data.notas = input.notas;
-    if (input.tipoIdentidad !== undefined) data.tipoIdentidad = input.tipoIdentidad;
-    if (input.numeroIdentidad !== undefined) data.numeroIdentidad = input.numeroIdentidad;
     if (input.fechaExpedicion !== undefined) data.fechaExpedicion = new Date(input.fechaExpedicion);
     if (input.fechaVencimiento !== undefined) data.fechaVencimiento = new Date(input.fechaVencimiento);
     if (input.departamentoId !== undefined) {

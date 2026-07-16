@@ -270,8 +270,6 @@ model Arrendatario {
   notas            String?
 
   // Identidad
-  tipoIdentidad         String  @map("tipo_identidad")
-  numeroIdentidad       String  @map("numero_identidad")
   fechaExpedicion       DateTime @map("fecha_expedicion") @db.Date
   fechaVencimiento      DateTime @map("fecha_vencimiento") @db.Date
 

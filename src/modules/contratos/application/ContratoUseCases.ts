@@ -101,10 +101,7 @@ export class CreateContratoUseCase {
 export class UpdateContratoUseCase {
   constructor(private readonly repository: ContratoRepository) {}
 
-  async execute(
-    id: string,
-    input: Partial<CreateContratoInput>,
-  ): Promise<ContratoCompleto> {
+  async execute(id: string, input: Partial<CreateContratoInput>): Promise<ContratoCompleto> {
     const data: Record<string, unknown> = {};
     if (input.fechaInicio !== undefined) data.fechaInicio = new Date(input.fechaInicio);
     if (input.fechaFin !== undefined) data.fechaFin = new Date(input.fechaFin);
@@ -372,23 +369,23 @@ export class UploadCedulaEnvioUseCase {
     let cedulaReversoUrl = envio.cedulaReversoUrl;
 
     if (files.frente) {
-      const { url } = await uploadBuffer({
+      const { key } = await uploadBuffer({
         buffer: files.frente.buffer,
         filename: files.frente.originalname || 'cedula-frente.jpg',
         contentType: files.frente.mimetype,
         prefix: `firmas/${envio.contratoId}/${envio.id}/cedula`,
       });
-      cedulaFrenteUrl = url;
+      cedulaFrenteUrl = key;
     }
 
     if (files.reverso) {
-      const { url } = await uploadBuffer({
+      const { key } = await uploadBuffer({
         buffer: files.reverso.buffer,
         filename: files.reverso.originalname || 'cedula-reverso.jpg',
         contentType: files.reverso.mimetype,
         prefix: `firmas/${envio.contratoId}/${envio.id}/cedula`,
       });
-      cedulaReversoUrl = url;
+      cedulaReversoUrl = key;
     }
 
     return this.repository.updateEnvioFirmaCedula(envio.id, {
@@ -440,7 +437,7 @@ export class EnsureEnvioPdfUseCase {
       version: contrato.version,
     });
 
-    const { url } = await uploadBuffer({
+    const { key } = await uploadBuffer({
       buffer: pdfBuffer,
       filename: `contrato-${contrato.id.slice(0, 8)}-firmado.pdf`,
       contentType: 'application/pdf',
@@ -448,11 +445,11 @@ export class EnsureEnvioPdfUseCase {
     });
 
     const updated = await this.repository.updateEnvioFirmaPdf(envio.id, {
-      pdfUrl: url,
+      pdfUrl: key,
       pdfGeneradoAt: new Date(),
     });
 
-    return { envio: updated, pdfUrl: url, generated: true };
+    return { envio: updated, pdfUrl: key, generated: true };
   }
 }
 

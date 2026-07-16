@@ -37,8 +37,6 @@ export const createArrendatarioSchema = z.object({
   historialPagos: z.string().optional(),
   avatar: z.string().optional(),
   notas: z.string().optional(),
-  tipoIdentidad: z.string().min(1).max(50),
-  numeroIdentidad: z.string().min(1).max(50),
   fechaExpedicion: dateString,
   fechaVencimiento: dateString,
 });

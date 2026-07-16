@@ -7,6 +7,7 @@ import { cedulaUpload } from '../../shared/middleware/cedulaUpload.js';
 import { validate } from '../../shared/middleware/validate.js';
 import { asyncHandler } from '../../shared/utils/asyncHandler.js';
 import { logger } from '../../shared/logger.js';
+import { getSignedObjectUrl } from '../../shared/storage/s3Storage.js';
 
 import {
   EnsureEnvioPdfUseCase,
@@ -39,6 +40,22 @@ const firmaPublicaSchema = z.object({
 
 type FirmaPublicaInput = z.infer<typeof firmaPublicaSchema>;
 
+type EnvioStorageUrls = {
+  cedulaFrenteUrl?: string | null;
+  cedulaReversoUrl?: string | null;
+  pdfUrl?: string | null;
+};
+
+async function signEnvioStorageUrls<T extends EnvioStorageUrls>(envio: T): Promise<T> {
+  const [cedulaFrenteUrl, cedulaReversoUrl, pdfUrl] = await Promise.all([
+    getSignedObjectUrl(envio.cedulaFrenteUrl),
+    getSignedObjectUrl(envio.cedulaReversoUrl),
+    getSignedObjectUrl(envio.pdfUrl),
+  ]);
+
+  return { ...envio, cedulaFrenteUrl, cedulaReversoUrl, pdfUrl };
+}
+
 function formatDate(d: Date | string): string {
   return new Date(d).toLocaleDateString('es-MX', {
     year: 'numeric',
@@ -54,6 +71,7 @@ export function createFirmasPublicRouter(): Router {
     '/firmas/:token',
     asyncHandler(async (req: Request, res: Response) => {
       const { envio, contrato } = await getEnvioUseCase.execute(req.params.token!);
+      const publicEnvio = await signEnvioStorageUrls(envio);
 
       res.json({
         success: true,
@@ -67,9 +85,9 @@ export function createFirmasPublicRouter(): Router {
             fechaFirmado: envio.fechaFirmado,
             nombreLegal: envio.nombreLegal,
             firmaData: envio.firmaData,
-            cedulaFrenteUrl: envio.cedulaFrenteUrl,
-            cedulaReversoUrl: envio.cedulaReversoUrl,
-            pdfUrl: envio.pdfUrl,
+            cedulaFrenteUrl: publicEnvio.cedulaFrenteUrl,
+            cedulaReversoUrl: publicEnvio.cedulaReversoUrl,
+            pdfUrl: publicEnvio.pdfUrl,
           },
           contrato: {
             id: contrato.id,
@@ -102,12 +120,13 @@ export function createFirmasPublicRouter(): Router {
           frente,
           reverso,
         });
+        const publicEnvio = await signEnvioStorageUrls(envio);
         res.json({
           success: true,
           data: {
             id: envio.id,
-            cedulaFrenteUrl: envio.cedulaFrenteUrl,
-            cedulaReversoUrl: envio.cedulaReversoUrl,
+            cedulaFrenteUrl: publicEnvio.cedulaFrenteUrl,
+            cedulaReversoUrl: publicEnvio.cedulaReversoUrl,
           },
         });
       } catch (err) {
@@ -126,6 +145,7 @@ export function createFirmasPublicRouter(): Router {
         nombreLegal: input.nombreLegal,
         firmaData: input.firma,
       });
+      const publicEnvio = await signEnvioStorageUrls(envio);
       res.json({
         success: true,
         data: {
@@ -133,8 +153,8 @@ export function createFirmasPublicRouter(): Router {
           estado: envio.estado,
           fechaFirmado: envio.fechaFirmado,
           nombreLegal: envio.nombreLegal,
-          cedulaFrenteUrl: envio.cedulaFrenteUrl,
-          cedulaReversoUrl: envio.cedulaReversoUrl,
+          cedulaFrenteUrl: publicEnvio.cedulaFrenteUrl,
+          cedulaReversoUrl: publicEnvio.cedulaReversoUrl,
         },
       });
     }),
@@ -144,10 +164,11 @@ export function createFirmasPublicRouter(): Router {
     '/firmas/:token/pdf',
     asyncHandler(async (req: Request, res: Response) => {
       const result = await ensurePdfUseCase.execute(req.params.token!);
+      const pdfUrl = await getSignedObjectUrl(result.pdfUrl);
       res.json({
         success: true,
         data: {
-          pdfUrl: result.pdfUrl,
+          pdfUrl,
           generated: result.generated,
         },
       });

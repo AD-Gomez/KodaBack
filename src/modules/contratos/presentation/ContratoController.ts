@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { NotFoundError } from '../../../shared/errors/index.js';
+import { getSignedObjectUrl } from '../../../shared/storage/s3Storage.js';
 import { asyncHandler } from '../../../shared/utils/asyncHandler.js';
 
 import {
@@ -22,6 +23,7 @@ import {
   UpdateContratoUseCase,
   UpdateFirmaEstadoUseCase,
 } from '../application/ContratoUseCases.js';
+import type { ContratoCompleto, EnvioFirma } from '../domain/Contrato.js';
 import type {
   ClausulaDto,
   CreateContratoDto,
@@ -33,6 +35,25 @@ import type {
   UpdateContratoDto,
   UpdateFirmaEstadoDto,
 } from './contratoValidators.js';
+
+async function signEnvioStorageUrls(envio: EnvioFirma): Promise<EnvioFirma> {
+  const [cedulaFrenteUrl, cedulaReversoUrl, pdfUrl] = await Promise.all([
+    getSignedObjectUrl(envio.cedulaFrenteUrl),
+    getSignedObjectUrl(envio.cedulaReversoUrl),
+    getSignedObjectUrl(envio.pdfUrl),
+  ]);
+
+  return { ...envio, cedulaFrenteUrl, cedulaReversoUrl, pdfUrl };
+}
+
+async function signContratoStorageUrls(contrato: ContratoCompleto): Promise<ContratoCompleto> {
+  if (!contrato.envios?.length) return contrato;
+
+  return {
+    ...contrato,
+    envios: await Promise.all(contrato.envios.map(signEnvioStorageUrls)),
+  };
+}
 
 export class ContratoController {
   constructor(
@@ -58,17 +79,18 @@ export class ContratoController {
   list = asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as { departamentoId?: string; arrendatarioId?: string; estado?: string };
     const data = await this.listUseCase.execute(q);
-    res.json({ success: true, data });
+    const responseData = await Promise.all(data.map(signContratoStorageUrls));
+    res.json({ success: true, data: responseData });
   });
 
   get = asyncHandler(async (req: Request, res: Response) => {
     const data = await this.getUseCase.execute(req.params.id!);
-    res.json({ success: true, data });
+    res.json({ success: true, data: await signContratoStorageUrls(data) });
   });
 
   getCurrentByDepartamento = asyncHandler(async (req: Request, res: Response) => {
     const data = await this.getCurrentUseCase.execute(req.params.departamentoId!);
-    res.json({ success: true, data });
+    res.json({ success: true, data: await signContratoStorageUrls(data) });
   });
 
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -90,7 +112,10 @@ export class ContratoController {
   renovar = asyncHandler(async (req: Request, res: Response) => {
     try {
       const dto = req.body as RenovarContratoDto;
-      const data = await this.renovarUseCase.execute(req.params.id!, { ...dto, creadoPorId: req.user!.id });
+      const data = await this.renovarUseCase.execute(req.params.id!, {
+        ...dto,
+        creadoPorId: req.user!.id,
+      });
       res.status(201).json({ success: true, data });
     } catch (err) {
       if (err instanceof NotFoundError) throw err;
