@@ -168,12 +168,27 @@ export function createInspeccionesRouter(): Router {
         where: { id: current.id },
         data: {
           estado: body.estado,
+          tipo: body.tipo,
           notasGenerales: body.notasGenerales,
           completadaAt: body.estado === 'COMPLETADA' ? new Date() : undefined,
         },
         include: detailInclude,
       });
       res.json({ success: true, data });
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    validate(inspeccionIdParamSchema, 'params'),
+    asyncHandler(async (req: Request, res: Response) => {
+      const inspeccion = await prisma.inspeccion.findUnique({ where: { id: String(req.params.id) } });
+      if (!inspeccion) throw new NotFoundError('Inspección');
+      if (inspeccion.estado === 'COMPLETADA') {
+        throw new ValidationError('Una inspección completada no se puede eliminar');
+      }
+      await prisma.inspeccion.delete({ where: { id: inspeccion.id } });
+      res.status(204).send();
     }),
   );
 
@@ -234,9 +249,6 @@ export function createInspeccionesRouter(): Router {
       if (!ambiente) throw new NotFoundError('Ambiente');
       if (ambiente.inspeccion.estado === 'COMPLETADA') {
         throw new ValidationError('Una inspección completada no se puede modificar');
-      }
-      if (ambiente.requerido) {
-        throw new ValidationError('Los ambientes requeridos no se pueden eliminar');
       }
       await prisma.ambienteInspeccion.delete({ where: { id: ambiente.id } });
       res.status(204).send();

@@ -29,6 +29,7 @@ export const createInspeccionSchema = z.object({
 
 export const updateInspeccionSchema = z.object({
   estado: estadoInspeccion.optional(),
+  tipo: tipoInspeccion.optional(),
   notasGenerales: z.string().max(4000).nullable().optional(),
 });
 
@@ -38,6 +39,7 @@ export const createAmbienteSchema = z.object({
 });
 
 export const updateAmbienteSchema = z.object({
+  nombre: z.string().trim().min(2).max(80).optional(),
   condicion: condicionInspeccion.optional(),
   observaciones: z.string().max(2000).nullable().optional(),
 });
