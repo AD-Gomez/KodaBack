@@ -14,8 +14,8 @@ export interface CreateArrendatarioInput {
   fechaIngreso: string;
   estado?: EstadoArrendatario;
   renta: number;
-  historialPagos?: string;
-  avatar?: string;
+  historialPagos?: string | null;
+  avatar?: string | null;
   notas?: string;
   tipoIdentidad: string;
   numeroIdentidad: string;
