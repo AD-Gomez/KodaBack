@@ -226,9 +226,6 @@ export function createInspeccionesRouter(): Router {
         include: { inspeccion: { select: { estado: true } } },
       });
       if (!ambiente) throw new NotFoundError('Ambiente');
-      if (ambiente.inspeccion.estado === 'COMPLETADA') {
-        throw new ValidationError('Una inspección completada no se puede modificar');
-      }
       const data = await prisma.ambienteInspeccion.update({
         where: { id: ambiente.id },
         data: body,
@@ -244,12 +241,8 @@ export function createInspeccionesRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const ambiente = await prisma.ambienteInspeccion.findFirst({
         where: { id: req.params.ambienteId, inspeccionId: req.params.id },
-        include: { inspeccion: { select: { estado: true } } },
       });
       if (!ambiente) throw new NotFoundError('Ambiente');
-      if (ambiente.inspeccion.estado === 'COMPLETADA') {
-        throw new ValidationError('Una inspección completada no se puede modificar');
-      }
       await prisma.ambienteInspeccion.delete({ where: { id: ambiente.id } });
       res.status(204).send();
     }),
