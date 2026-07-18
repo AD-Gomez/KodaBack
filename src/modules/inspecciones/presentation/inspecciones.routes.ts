@@ -223,6 +223,26 @@ export function createInspeccionesRouter(): Router {
     }),
   );
 
+  router.delete(
+    '/:id/ambientes/:ambienteId',
+    validate(ambienteParamSchema, 'params'),
+    asyncHandler(async (req: Request, res: Response) => {
+      const ambiente = await prisma.ambienteInspeccion.findFirst({
+        where: { id: req.params.ambienteId, inspeccionId: req.params.id },
+        include: { inspeccion: { select: { estado: true } } },
+      });
+      if (!ambiente) throw new NotFoundError('Ambiente');
+      if (ambiente.inspeccion.estado === 'COMPLETADA') {
+        throw new ValidationError('Una inspección completada no se puede modificar');
+      }
+      if (ambiente.requerido) {
+        throw new ValidationError('Los ambientes requeridos no se pueden eliminar');
+      }
+      await prisma.ambienteInspeccion.delete({ where: { id: ambiente.id } });
+      res.status(204).send();
+    }),
+  );
+
   router.post(
     '/:id/ambientes/:ambienteId/fotos',
     validate(ambienteParamSchema, 'params'),
