@@ -41,7 +41,13 @@ function renderSignature(
   const signatureBuffer = parseDataUrl(signature.firmaDataUrl);
 
   const signatureY = y;
-  doc.save().lineWidth(1).strokeColor('#cbd5e1').rect(x, signatureY, width, signatureHeight).stroke().restore();
+  doc
+    .save()
+    .lineWidth(1)
+    .strokeColor('#cbd5e1')
+    .rect(x, signatureY, width, signatureHeight)
+    .stroke()
+    .restore();
 
   if (signatureBuffer) {
     try {
@@ -60,10 +66,15 @@ function renderSignature(
       .font('Helvetica')
       .fontSize(8)
       .fillColor('#64748b')
-      .text(`Firmado: ${formatDateTime(signature.fechaFirmado)}`, x, signatureY + signatureHeight + 60, {
-        width,
-        align: 'center',
-      });
+      .text(
+        `Firmado: ${formatDateTime(signature.fechaFirmado)}`,
+        x,
+        signatureY + signatureHeight + 60,
+        {
+          width,
+          align: 'center',
+        },
+      );
   }
 
   doc
@@ -141,15 +152,62 @@ function chooseFont(format: InlineFormat, boldFont: string, italicFont: string):
   return 'Helvetica';
 }
 
+const CLAUSE_ORDINALS =
+  'PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|SÉPTIMA|SEPTIMA|OCTAVA|NOVENA|DÉCIMA|DECIMA|UNDÉCIMA|UNDECIMA|DUODÉCIMA|DUODECIMA';
+
+function formatPlainContractContent(value: string): string {
+  let formatted = value.replace(/\s+/g, ' ').trim();
+  if (!formatted) return '';
+
+  const clauseWithSubject = new RegExp(
+    `(^|[\\s:;])(?:\\d+\\s*[:.)-]?\\s*)?(${CLAUSE_ORDINALS})\\s*:\\s*([^\\n.]{2,48})\\.-\\s*`,
+    'giu',
+  );
+  const clauseWithoutSubject = new RegExp(
+    `(^|[\\s:;])(?:\\d+\\s*[:.)-]?\\s*)?(${CLAUSE_ORDINALS})\\s*:\\s*`,
+    'giu',
+  );
+
+  formatted = formatted.replace(
+    clauseWithSubject,
+    (_match, prefix: string, ordinal: string, subject: string) => {
+      return `${prefix}</p><h3>CLÁUSULA ${ordinal.toUpperCase()} · ${subject.trim().toUpperCase()}</h3><p>`;
+    },
+  );
+  formatted = formatted.replace(clauseWithoutSubject, (_match, prefix: string, ordinal: string) => {
+    return `${prefix}</p><h3>CLÁUSULA ${ordinal.toUpperCase()}</h3><p>`;
+  });
+
+  formatted = formatted.replace(
+    /(Los bienes muebles(?:\s+siguientes)?\s*:\s*)([\s\S]*?)(?=<\/p>|$)/iu,
+    (_match, introduction: string, rawItems: string) => {
+      const items = rawItems
+        .trim()
+        .split(/,\s*(?=(?:(?:un|una|dos|tres|cuatro|cinco)\s*\(\d+\)|\(\d+\)\s*[A-Za-zÁÉÍÓÚÑ]))/iu)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (items.length < 2) return `${introduction}${rawItems}`;
+      return `${introduction}</p><ul>${items.map((item) => `<li>${item}</li>`).join('')}</ul>`;
+    },
+  );
+
+  formatted = formatted.replace(
+    /\b(EL\s+ARRENDADOR|EL\s+ARRENDATARIO|LAS\s+PARTES|CONTRATO\s+DE\s+ARRENDAMIENTO|CANON\s+DE\s+ARRENDAMIENTO)\b/giu,
+    '<strong>$1</strong>',
+  );
+
+  return `<p>${formatted}</p>`;
+}
+
 function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
-  const text = decodeEntities(html).replace(/\r\n/g, '\n');
+  const source = decodeEntities(html).replace(/\r\n/g, '\n');
+  const text = /<\/?[a-z][^>]*>/i.test(source) ? source : formatPlainContractContent(source);
   const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
   const tagStack: string[] = [];
-  const formatStack: InlineFormat[] = [DEFAULT_FORMAT];
   let buffer = '';
   let listIndex = 0;
 
-  const currentFormat = (): InlineFormat => formatStack[formatStack.length - 1] ?? DEFAULT_FORMAT;
   const inList = (): 'ul' | 'ol' | null => {
     for (let i = tagStack.length - 1; i >= 0; i--) {
       const tag = tagStack[i];
@@ -160,12 +218,16 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
   };
 
   const flushParagraph = (blockTag: string | null) => {
-    const trimmed = buffer.replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+    const trimmed = buffer
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{2,}/g, '\n')
+      .trim();
     buffer = '';
     if (!trimmed) return;
 
     const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
-    const baseSize = headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
+    const baseSize =
+      headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
     const isBlockquote = blockTag === 'blockquote';
     const listType = inList();
 
@@ -201,15 +263,13 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
       const isLastLine = lineIdx === lines.length - 1;
       let first = true;
       for (const segment of segments) {
-        const font = chooseFont(
-          segment.format,
-          headingTag ? 'Helvetica-Bold' : 'Helvetica-Bold',
-          'Helvetica-Oblique',
-        );
+        const font = headingTag
+          ? 'Helvetica-Bold'
+          : chooseFont(segment.format, 'Helvetica-Bold', 'Helvetica-Oblique');
         doc
           .font(font)
           .fontSize(baseSize)
-          .fillColor(isBlockquote ? '#475569' : '#1e293b');
+          .fillColor(headingTag ? '#0f172a' : isBlockquote ? '#475569' : '#1e293b');
         doc.text(segment.text, indent, doc.y, {
           continued: !first || !isLastLine || segments.length > 1,
           width: doc.page.width - doc.page.margins.right - indent + widthOffset,
@@ -220,10 +280,6 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     });
 
     doc.moveDown(0.4);
-  };
-
-  const flushListItem = () => {
-    flushParagraph('li');
   };
 
   let lastIndex = 0;
@@ -244,69 +300,42 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
 
     if (BLOCK_TAGS.has(rawTag) || rawTag === 'li' || rawTag === 'div') {
       if (!closing) {
+        const activeBlock = tagStack[tagStack.length - 1] ?? null;
+        flushParagraph(activeBlock);
+
         if (rawTag === 'ul' || rawTag === 'ol') {
           listIndex = 0;
-          flushParagraph('p');
           tagStack.push(rawTag);
-        } else if (rawTag === 'li') {
-          flushListItem();
-          tagStack.push('li');
         } else {
-          const top = tagStack[tagStack.length - 1];
-          if (top === 'li') {
-            tagStack.pop();
-            flushListItem();
-          }
-          if (rawTag === 'p' && buffer.trim() === '') continue;
-          flushParagraph(rawTag);
           tagStack.push(rawTag);
         }
       } else {
         const top = tagStack[tagStack.length - 1];
         if (top === rawTag) {
-          if (rawTag === 'li') {
-            tagStack.pop();
-            flushListItem();
-          } else {
-            tagStack.pop();
-          }
+          flushParagraph(rawTag);
+          tagStack.pop();
         }
       }
       continue;
     }
 
     if (rawTag === 'strong' || rawTag === 'b') {
-      if (closing) {
-        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, bold: true });
-        if (idx > 0) formatStack.splice(idx, 1);
-      } else {
-        formatStack.push({ ...currentFormat(), bold: true });
-      }
+      buffer += closing ? `</${rawTag}>` : `<${rawTag}>`;
       continue;
     }
     if (rawTag === 'em' || rawTag === 'i') {
-      if (closing) {
-        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, italic: true });
-        if (idx > 0) formatStack.splice(idx, 1);
-      } else {
-        formatStack.push({ ...currentFormat(), italic: true });
-      }
+      buffer += closing ? `</${rawTag}>` : `<${rawTag}>`;
       continue;
     }
     if (rawTag === 'u') {
-      if (closing) {
-        const idx = formatStack.lastIndexOf({ ...formatStack[formatStack.length - 1]!, underline: true });
-        if (idx > 0) formatStack.splice(idx, 1);
-      } else {
-        formatStack.push({ ...currentFormat(), underline: true });
-      }
+      buffer += closing ? `</${rawTag}>` : `<${rawTag}>`;
       continue;
     }
   }
 
   const tail = text.slice(lastIndex);
   if (tail) buffer += tail;
-  flushParagraph(null);
+  flushParagraph(tagStack[tagStack.length - 1] ?? null);
 }
 
 function parseInlineSegments(line: string): Array<{ text: string; format: InlineFormat }> {
@@ -340,19 +369,19 @@ function parseInlineSegments(line: string): Array<{ text: string; format: Inline
     if (tag === 'strong' || tag === 'b') {
       flush();
       if (!closing) formatStack.push({ ...currentFormat(), bold: true });
-      else formatStack.pop();
+      else if (formatStack.length > 1) formatStack.pop();
       continue;
     }
     if (tag === 'em' || tag === 'i') {
       flush();
       if (!closing) formatStack.push({ ...currentFormat(), italic: true });
-      else formatStack.pop();
+      else if (formatStack.length > 1) formatStack.pop();
       continue;
     }
     if (tag === 'u') {
       flush();
       if (!closing) formatStack.push({ ...currentFormat(), underline: true });
-      else formatStack.pop();
+      else if (formatStack.length > 1) formatStack.pop();
       continue;
     }
     // Block tags shouldn't appear inline, but skip them defensively
