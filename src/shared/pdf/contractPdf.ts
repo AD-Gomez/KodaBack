@@ -16,12 +16,66 @@ export interface CedulaPdfInput {
   fechaFirmado: Date;
   nombreLegal: string;
   firmaDataUrl: string;
+  firmasCapturadas?: Array<{
+    nombre: string;
+    rol: 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE';
+    firmaDataUrl: string;
+    fechaFirmado?: Date | null;
+  }>;
   cedulaFrenteUrl?: string | null;
   cedulaReversoUrl?: string | null;
   contenido?: string | null;
   ipFirmado?: string | null;
   userAgent?: string | null;
   version: number;
+}
+
+function renderSignature(
+  doc: PDFKit.PDFDocument,
+  signature: NonNullable<CedulaPdfInput['firmasCapturadas']>[number],
+  x: number,
+  y: number,
+  width: number,
+) {
+  const signatureHeight = 100;
+  const signatureBuffer = parseDataUrl(signature.firmaDataUrl);
+
+  const signatureY = y;
+  doc.save().lineWidth(1).strokeColor('#cbd5e1').rect(x, signatureY, width, signatureHeight).stroke().restore();
+
+  if (signatureBuffer) {
+    try {
+      doc.image(signatureBuffer, x + 6, signatureY + 6, {
+        fit: [width - 12, signatureHeight - 12],
+        align: 'center',
+        valign: 'center',
+      });
+    } catch (err) {
+      logger.warn({ err, nombre: signature.nombre }, 'No se pudo incrustar una firma en el PDF');
+    }
+  }
+
+  if (signature.fechaFirmado) {
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor('#64748b')
+      .text(`Firmado: ${formatDateTime(signature.fechaFirmado)}`, x, signatureY + signatureHeight + 60, {
+        width,
+        align: 'center',
+      });
+  }
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(11)
+    .fillColor('#0f172a')
+    .text(signature.rol, x, signatureY + signatureHeight + 9, { width, align: 'center' });
+  doc
+    .font('Helvetica')
+    .fontSize(9)
+    .fillColor('#475569')
+    .text(signature.nombre, x, signatureY + signatureHeight + 24, { width, align: 'center' });
 }
 
 async function fetchAsPngBuffer(reference: string): Promise<Buffer | null> {
@@ -47,14 +101,6 @@ function parseDataUrl(dataUrl: string): Buffer | null {
   const match = /^data:image\/[a-zA-Z+]+;base64,(.+)$/.exec(dataUrl);
   if (!match) return null;
   return Buffer.from(match[1]!, 'base64');
-}
-
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('es-MX', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 function formatDateTime(d: Date): string {
@@ -339,109 +385,56 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk as Buffer));
 
-  // --- Encabezado ---
-  doc.fillColor('#0f172a').fontSize(20).font('Helvetica-Bold').text('KodaHouse', { align: 'left' });
-  doc
-    .fontSize(9)
-    .fillColor('#64748b')
-    .font('Helvetica')
-    .text('Contrato firmado electrónicamente', { align: 'left' });
-  doc.moveDown(0.6);
-  doc
-    .strokeColor('#e2e8f0')
-    .lineWidth(0.8)
-    .moveTo(doc.page.margins.left, doc.y)
-    .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-    .stroke();
-  doc.moveDown(1);
-
-  // --- Datos del contrato ---
-  doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Datos del contrato');
-  doc.moveDown(0.4);
-  doc.fontSize(11).fillColor('#1e293b').font('Helvetica');
-
-  const labelFont = 'Helvetica-Bold';
-  const valueFont = 'Helvetica';
-  const lineHeight = 16;
-  const startY = doc.y;
-  const colWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right) / 2;
-
-  function pair(label: string, value: string, row: number, col: 0 | 1) {
-    const x = doc.page.margins.left + col * colWidth;
-    const y = startY + row * lineHeight * 2.2;
-    doc
-      .font(labelFont)
-      .fontSize(9)
-      .fillColor('#64748b')
-      .text(label.toUpperCase(), x, y, { width: colWidth - 8 });
-    doc
-      .font(valueFont)
-      .fontSize(11)
-      .fillColor('#0f172a')
-      .text(value || '—', x, y + 12, { width: colWidth - 8 });
-  }
-
-  pair('Título', input.contractTitulo || `Contrato de arrendamiento`, 0, 0);
-  pair('Versión', `v${input.version}`, 0, 1);
-  pair('Propiedad', input.departamentoNombre, 1, 0);
-  pair('Dirección', input.departamentoDireccion, 1, 1);
-  pair('Arrendatario', input.arrendatarioNombre, 2, 0);
-  pair('ID interno', input.contractId.slice(0, 8).toUpperCase(), 2, 1);
-  pair('Fecha de inicio', formatDate(input.fechaInicio), 3, 0);
-  pair('Fecha de fin', formatDate(input.fechaFin), 3, 1);
-
-  doc.y = startY + 4 * lineHeight * 2.2 + 6;
-  doc.moveDown(1);
-
   // --- Texto del contrato aceptado ---
   if (input.contenido && input.contenido.trim()) {
-    doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Contrato aceptado');
-    doc.moveDown(0.3);
-    doc.fontSize(9).fillColor('#64748b').font('Helvetica').text(
-      'A continuación se reproduce el contenido íntegro del contrato que el firmante declara aceptar al firmar:',
-    );
-    doc.moveDown(0.4);
     renderContractContent(doc, input.contenido);
     doc.moveDown(0.5);
   }
 
-  // --- Bloque de firma ---
-  doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Firma electrónica');
-  doc.moveDown(0.3);
-  doc.fontSize(11).fillColor('#1e293b').font('Helvetica');
-  doc.text(`Firmante legal: ${input.nombreLegal}`);
-  doc.text(`Fecha de firma: ${formatDateTime(input.fechaFirmado)}`);
-  if (input.ipFirmado) doc.text(`IP del firmante: ${input.ipFirmado}`);
-  if (input.userAgent) doc.text(`Navegador / dispositivo: ${input.userAgent}`);
-  doc.moveDown(0.5);
+  // --- Página final de firmas ---
+  doc.addPage();
+  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Firmas del contrato');
+  doc.moveDown(0.35);
+  doc
+    .fontSize(10)
+    .fillColor('#475569')
+    .font('Helvetica')
+    .text('Firmas electrónicas capturadas de las partes del contrato.', { align: 'left' });
+  doc.moveDown(1.2);
 
-  const firmaBuf = parseDataUrl(input.firmaDataUrl);
-  if (firmaBuf) {
-    const firmaW = 220;
-    const firmaH = 90;
-    doc
-      .save()
-      .lineWidth(1)
-      .strokeColor('#cbd5e1')
-      .rect(doc.x, doc.y, firmaW, firmaH)
-      .stroke()
-      .restore();
-    try {
-      doc.image(firmaBuf, doc.x + 4, doc.y + 4, { width: firmaW - 8, height: firmaH - 8 });
-    } catch (err) {
-      logger.warn({ err }, 'No se pudo incrustar la firma en el PDF');
-    }
-    doc.y += firmaH + 6;
+  const firmasCapturadas = input.firmasCapturadas?.filter((firma) => firma.firmaDataUrl) ?? [];
+  const signatures = firmasCapturadas.length
+    ? firmasCapturadas
+    : [
+        {
+          nombre: input.nombreLegal,
+          rol: 'FIRMANTE' as const,
+          firmaDataUrl: input.firmaDataUrl,
+          fechaFirmado: input.fechaFirmado,
+        },
+      ];
+  const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
+  const signatureY = doc.y;
+
+  for (let i = 0; i < signatures.length; i++) {
+    const signature = signatures[i]!;
+    const column = i % 2;
+    const row = Math.floor(i / 2);
+    const x = doc.page.margins.left + column * (signatureWidth + 24);
+    const y = signatureY + row * 195;
+    renderSignature(doc, signature, x, y, signatureWidth);
   }
 
+  // --- Página independiente de cédula ---
+  doc.addPage();
+  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Documento de identidad');
+  doc.moveDown(0.35);
+  doc
+    .fontSize(10)
+    .fillColor('#475569')
+    .font('Helvetica')
+    .text(`Fotografías de la cédula de ${input.nombreLegal}.`, { align: 'left' });
   doc.moveDown(1);
-
-  // --- Cédula ---
-  doc.fontSize(14).fillColor('#0f172a').font('Helvetica-Bold').text('Identidad verificada');
-  doc.moveDown(0.4);
-  doc.fontSize(10).fillColor('#475569').font('Helvetica');
-  doc.text('Fotografías del documento de identidad del firmante:');
-  doc.moveDown(0.6);
 
   const cedulaImgs: Array<{ url: string; label: string }> = [];
   if (input.cedulaFrenteUrl)
@@ -453,18 +446,14 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
     doc.fillColor('#94a3b8').font('Helvetica-Oblique').text('Sin fotografías cargadas.');
   } else {
     const imgW = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 16) / 2;
-    const imgH = 170;
+    const imgH = 250;
+    const cedulaStartY = doc.y;
     for (let i = 0; i < cedulaImgs.length; i++) {
       const slot = cedulaImgs[i]!;
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = doc.page.margins.left + col * (imgW + 16);
-      const y = doc.y + row * (imgH + 28);
-      if (row === 0 && col === 0) {
-        // primera iteración usa doc.y actual
-      } else if (col === 0) {
-        doc.y = y;
-      }
+      const y = cedulaStartY + row * (imgH + 28);
       const png = await fetchAsPngBuffer(slot.url);
       if (png) {
         try {
@@ -490,7 +479,7 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
         .fillColor('#64748b')
         .text(slot.label, x, y + imgH + 4, { width: imgW, align: 'center' });
     }
-    doc.y += imgH + 24;
+    doc.y = cedulaStartY + Math.ceil(cedulaImgs.length / 2) * (imgH + 28);
   }
 
   // --- Footer ---

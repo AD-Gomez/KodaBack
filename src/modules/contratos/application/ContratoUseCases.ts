@@ -436,12 +436,33 @@ export class EnsureEnvioPdfUseCase {
       throw new ValidationError('Falta el nombre legal del firmante.');
     }
 
-    if (envio.pdfUrl) {
-      return { envio, pdfUrl: envio.pdfUrl, generated: false };
-    }
-
     const contrato = await this.repository.findById(envio.contratoId);
     if (!contrato) throw new NotFoundError('Contrato');
+
+    const tipoPorEmail = new Map(
+      (contrato.firmas ?? []).flatMap((firma) =>
+        firma.email ? [[firma.email.trim().toLowerCase(), firma.tipo] as const] : [],
+      ),
+    );
+    const firmasCapturadas = (contrato.envios ?? [])
+      .filter((firmante) => firmante.fechaFirmado)
+      .map((firmante) => {
+        const tipo = tipoPorEmail.get(firmante.email.trim().toLowerCase());
+        const rol: 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE' =
+          tipo === 'PROPIETARIO'
+            ? 'ARRENDADOR'
+            : tipo === 'ARRENDATARIO'
+              ? 'ARRENDATARIO'
+              : 'FIRMANTE';
+
+        return {
+          nombre: firmante.nombreLegal ?? firmante.nombre,
+          rol,
+          firmaDataUrl: firmante.firmaData ?? '',
+          fechaFirmado: firmante.fechaFirmado,
+        };
+      })
+      .filter((firma) => firma.rol !== 'FIRMANTE' && firma.firmaDataUrl);
 
     const pdfBuffer = await buildSignedContractPdf({
       contractId: contrato.id,
@@ -454,6 +475,7 @@ export class EnsureEnvioPdfUseCase {
       fechaFirmado: new Date(envio.fechaFirmado),
       nombreLegal: envio.nombreLegal,
       firmaDataUrl: envio.firmaData,
+      firmasCapturadas,
       cedulaFrenteUrl: envio.cedulaFrenteUrl,
       cedulaReversoUrl: envio.cedulaReversoUrl,
       contenido: contrato.contenido ?? '',
