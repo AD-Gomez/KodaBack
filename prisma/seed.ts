@@ -317,7 +317,7 @@ async function main(): Promise<void> {
       version: 3,
       fechaInicio: d(15, 0, 2024),
       fechaFin: d(15, 10, 2026),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: [
         'El arrendatario se compromete a pagar la renta el día 5 de cada mes',
         'Prohibido subarrendar sin autorización del propietario',
@@ -332,7 +332,7 @@ async function main(): Promise<void> {
       version: 2,
       fechaInicio: d(20, 2, 2023),
       fechaFin: d(15, 3, 2027),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: [
         'El arrendatario se compromete a pagar la renta el día 5 de cada mes',
         'Sin mascotas',
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
       version: 2,
       fechaInicio: d(10, 5, 2023),
       fechaFin: d(15, 4, 2027),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: [
         'El arrendatario se compromete a pagar la renta el día 5 de cada mes',
         'Mantenimiento del jardín por cuenta del arrendatario',
@@ -358,7 +358,7 @@ async function main(): Promise<void> {
       version: 1,
       fechaInicio: d(1, 10, 2023),
       fechaFin: d(15, 8, 2026),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: [
         'El arrendatario se compromete a pagar la renta el día 5 de cada mes',
         'Mantenimiento del jardín',
@@ -371,7 +371,7 @@ async function main(): Promise<void> {
       version: 1,
       fechaInicio: d(1, 11, 2023),
       fechaFin: d(15, 8, 2026),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: ['Pago puntual', 'Mantenimiento del jardín'],
     },
     {
@@ -380,7 +380,7 @@ async function main(): Promise<void> {
       version: 1,
       fechaInicio: d(5, 0, 2024),
       fechaFin: d(15, 11, 2026),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: ['Pago puntual', 'No subarrendar'],
     },
     {
@@ -389,7 +389,7 @@ async function main(): Promise<void> {
       version: 2,
       fechaInicio: d(15, 6, 2023),
       fechaFin: d(15, 10, 2026),
-      estado: 'VIGENTE' as const,
+      estado: 'FIRMADO' as const,
       clausulas: ['Pago puntual', 'No subarrendar'],
     },
   ];

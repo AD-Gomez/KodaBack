@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const dateString = z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha inválida');
 
-const estadoContratoEnum = z.enum(['BORRADOR', 'VIGENTE', 'VENCIDO', 'RENOVADO', 'CANCELADO']);
+const estadoContratoEnum = z.enum(['BORRADOR', 'EN_PROCESO', 'FIRMADO', 'VENCIDO', 'RENOVADO', 'CANCELADO']);
 const estadoFirmaEnum = z.enum(['PENDIENTE', 'FIRMADO', 'RECHAZADO']);
 const tipoFirmaEnum = z.enum(['ARRENDATARIO', 'PROPIETARIO', 'TESTIGO']);
 

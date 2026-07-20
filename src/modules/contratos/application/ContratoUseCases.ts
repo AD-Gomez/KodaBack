@@ -125,8 +125,8 @@ export class RenovarContratoUseCase {
     const anterior = await this.repository.findById(contratoAnteriorId);
     if (!anterior) throw new NotFoundError('Contrato');
 
-    if (anterior.estado === 'VIGENTE') {
-      throw new ConflictError('El contrato actual aún está vigente');
+    if (anterior.estado === 'FIRMADO') {
+      throw new ConflictError('El contrato actual aún está firmado y activo');
     }
 
     const nuevo = await this.repository.create({
@@ -135,7 +135,7 @@ export class RenovarContratoUseCase {
       version: anterior.version + 1,
       fechaInicio: new Date(input.fechaInicio),
       fechaFin: new Date(input.fechaFin),
-      estado: 'VIGENTE',
+      estado: 'FIRMADO',
       creadoPor: input.creadoPorId ? { connect: { id: input.creadoPorId } } : undefined,
     });
 
@@ -263,6 +263,10 @@ export class AddEnvioFirmaUseCase {
       email: input.email,
     });
 
+    if (contrato.estado === 'BORRADOR') {
+      await this.repository.update(contrato.id, { estado: 'EN_PROCESO' });
+    }
+
     let emailSent = false;
     let emailError: string | undefined;
 
@@ -332,6 +336,8 @@ export class FirmarEnvioUseCase {
 
     const firmado = await this.repository.markEnvioFirmaFirmado(envio.id, data);
 
+    await this.tryMarkContratoFirmado(contrato.id);
+
     if (this.notifier && contrato.creadoPorId) {
       try {
         await this.notifier.notifyContractSigned({
@@ -351,6 +357,19 @@ export class FirmarEnvioUseCase {
     }
 
     return firmado;
+  }
+
+  private async tryMarkContratoFirmado(contratoId: string): Promise<void> {
+    const contrato = await this.repository.findById(contratoId);
+    if (!contrato) return;
+    if (contrato.estado === 'FIRMADO' || contrato.estado === 'VENCIDO' || contrato.estado === 'RENOVADO' || contrato.estado === 'CANCELADO') {
+      return;
+    }
+    const envios = contrato.envios ?? [];
+    if (envios.length === 0) return;
+    const todosFirmados = envios.every((e) => e.estado === 'FIRMADO');
+    if (!todosFirmados) return;
+    await this.repository.update(contratoId, { estado: 'FIRMADO' });
   }
 }
 

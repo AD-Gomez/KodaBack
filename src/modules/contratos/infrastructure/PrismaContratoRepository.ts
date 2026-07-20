@@ -51,7 +51,7 @@ export class PrismaContratoRepository implements ContratoRepository {
 
   async findCurrentByDepartamento(departamentoId: string): Promise<ContratoCompleto | null> {
     return this.prisma.contrato.findFirst({
-      where: { departamentoId, estado: 'VIGENTE' as EstadoContrato },
+      where: { departamentoId, estado: 'FIRMADO' as EstadoContrato },
       orderBy: { version: 'desc' },
       include: FULL_INCLUDE,
     });

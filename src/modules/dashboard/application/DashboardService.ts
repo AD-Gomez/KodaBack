@@ -22,7 +22,7 @@ export interface DashboardSummary {
     inversionTotal: number;
   };
   contratos: {
-    vigentes: number;
+    firmados: number;
     porVencer: number;
     borradores: number;
   };
@@ -49,7 +49,7 @@ export class DashboardService {
       pendientesRep,
       urgentesRep,
       inversionRep,
-      contratosVigentes,
+      contratosFirmados,
       contratosBorradores,
     ] = await Promise.all([
       this.prisma.departamento.count(),
@@ -65,7 +65,7 @@ export class DashboardService {
         where: { prioridad: 'URGENTE', estado: { not: 'COMPLETADA' } },
       }),
       this.prisma.reparacion.aggregate({ _sum: { costo: true } }),
-      this.prisma.contrato.count({ where: { estado: 'VIGENTE' } }),
+      this.prisma.contrato.count({ where: { estado: 'FIRMADO' } }),
       this.prisma.contrato.count({ where: { estado: 'BORRADOR' } }),
     ]);
 
@@ -75,7 +75,7 @@ export class DashboardService {
 
     const porVencer = await this.prisma.contrato.count({
       where: {
-        estado: 'VIGENTE',
+        estado: 'FIRMADO',
         fechaFin: { gte: ahora, lte: en30Dias },
       },
     });
@@ -108,7 +108,7 @@ export class DashboardService {
         inversionTotal: Number(inversionRep._sum.costo ?? 0),
       },
       contratos: {
-        vigentes: contratosVigentes,
+        firmados: contratosFirmados,
         porVencer,
         borradores: contratosBorradores,
       },

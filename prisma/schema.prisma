@@ -42,7 +42,8 @@ enum TipoDocumento {
 
 enum EstadoContrato {
   BORRADOR
-  VIGENTE
+  EN_PROCESO
+  FIRMADO
   VENCIDO
   RENOVADO
   CANCELADO
