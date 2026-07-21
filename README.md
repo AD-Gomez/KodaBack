@@ -209,7 +209,7 @@ Usuario ──┐
        Contrato ──── versión + estado
        │   │ │
        │   │ └── Clausula[]    (orden, texto, editable)
-       │   │ ├── Firma[]       (ARRENDATARIO / PROPIETARIO / TESTIGO)
+        │   │ ├── Firma[]       (ARRENDATARIO / PROPIETARIO / TESTIGO / ABOGADO)
        │   │ ├── EnvioFirma[]  (pendientes de firma digital)
        │   │ ├── Documento[]   (PDFs asociados)
        │   │ └── Historial[]   (cambios por versión)

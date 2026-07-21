@@ -4,7 +4,7 @@ const dateString = z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha
 
 const estadoContratoEnum = z.enum(['BORRADOR', 'EN_PROCESO', 'FIRMADO', 'VENCIDO', 'RENOVADO', 'CANCELADO']);
 const estadoFirmaEnum = z.enum(['PENDIENTE', 'FIRMADO', 'RECHAZADO']);
-const tipoFirmaEnum = z.enum(['ARRENDATARIO', 'PROPIETARIO', 'TESTIGO']);
+const tipoFirmaEnum = z.enum(['ARRENDATARIO', 'PROPIETARIO', 'TESTIGO', 'ABOGADO']);
 
 export const uuidParam = z.object({ id: z.string().uuid('ID inválido') });
 

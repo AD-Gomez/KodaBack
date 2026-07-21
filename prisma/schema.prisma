@@ -53,6 +53,7 @@ enum TipoFirma {
   ARRENDATARIO
   PROPIETARIO
   TESTIGO
+  ABOGADO
 }
 
 enum EstadoFirma {
