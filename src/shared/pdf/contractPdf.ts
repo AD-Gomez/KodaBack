@@ -18,7 +18,7 @@ export interface CedulaPdfInput {
   firmaDataUrl: string;
   firmasCapturadas?: Array<{
     nombre: string;
-    rol: 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE';
+    rol: 'ABOGADA' | 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE';
     firmaDataUrl: string;
     fechaFirmado?: Date | null;
   }>;
@@ -432,25 +432,40 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   doc.moveDown(1.2);
 
   const firmasCapturadas = input.firmasCapturadas?.filter((firma) => firma.firmaDataUrl) ?? [];
-  const signatures = firmasCapturadas.length
-    ? firmasCapturadas
-    : [
-        {
-          nombre: input.nombreLegal,
-          rol: 'FIRMANTE' as const,
-          firmaDataUrl: input.firmaDataUrl,
-          fechaFirmado: input.fechaFirmado,
-        },
-      ];
+  const signatures = (
+    firmasCapturadas.length
+      ? firmasCapturadas
+      : [
+          {
+            nombre: input.nombreLegal,
+            rol: 'FIRMANTE' as const,
+            firmaDataUrl: input.firmaDataUrl,
+            fechaFirmado: input.fechaFirmado,
+          },
+        ]
+  )
+    .slice()
+    .sort((a, b) => {
+      const order = { ABOGADA: 0, ARRENDADOR: 1, ARRENDATARIO: 2, FIRMANTE: 3 } as const;
+      return order[a.rol] - order[b.rol];
+    });
   const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
   const signatureY = doc.y;
+  const firmaAbogada = signatures.find((signature) => signature.rol === 'ABOGADA');
+  const firmasPartes = signatures.filter((signature) => signature.rol !== 'ABOGADA');
 
-  for (let i = 0; i < signatures.length; i++) {
-    const signature = signatures[i]!;
+  if (firmaAbogada) {
+    const attorneyX = doc.page.margins.left + signatureWidth / 2 + 12;
+    renderSignature(doc, firmaAbogada, attorneyX, signatureY, signatureWidth);
+  }
+
+  const partyStartY = signatureY + (firmaAbogada ? 195 : 0);
+  for (let i = 0; i < firmasPartes.length; i++) {
+    const signature = firmasPartes[i]!;
     const column = i % 2;
     const row = Math.floor(i / 2);
     const x = doc.page.margins.left + column * (signatureWidth + 24);
-    const y = signatureY + row * 195;
+    const y = partyStartY + row * 195;
     renderSignature(doc, signature, x, y, signatureWidth);
   }
 

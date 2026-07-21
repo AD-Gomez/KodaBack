@@ -362,7 +362,12 @@ export class FirmarEnvioUseCase {
   private async tryMarkContratoFirmado(contratoId: string): Promise<void> {
     const contrato = await this.repository.findById(contratoId);
     if (!contrato) return;
-    if (contrato.estado === 'FIRMADO' || contrato.estado === 'VENCIDO' || contrato.estado === 'RENOVADO' || contrato.estado === 'CANCELADO') {
+    if (
+      contrato.estado === 'FIRMADO' ||
+      contrato.estado === 'VENCIDO' ||
+      contrato.estado === 'RENOVADO' ||
+      contrato.estado === 'CANCELADO'
+    ) {
       return;
     }
     const envios = contrato.envios ?? [];
@@ -448,12 +453,14 @@ export class EnsureEnvioPdfUseCase {
       .filter((firmante) => firmante.fechaFirmado)
       .map((firmante) => {
         const tipo = tipoPorEmail.get(firmante.email.trim().toLowerCase());
-        const rol: 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE' =
-          tipo === 'PROPIETARIO'
-            ? 'ARRENDADOR'
-            : tipo === 'ARRENDATARIO'
-              ? 'ARRENDATARIO'
-              : 'FIRMANTE';
+        const rol: 'ABOGADA' | 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE' =
+          tipo === 'ABOGADO'
+            ? 'ABOGADA'
+            : tipo === 'PROPIETARIO'
+              ? 'ARRENDADOR'
+              : tipo === 'ARRENDATARIO'
+                ? 'ARRENDATARIO'
+                : 'FIRMANTE';
 
         return {
           nombre: firmante.nombreLegal ?? firmante.nombre,
