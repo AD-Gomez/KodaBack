@@ -387,6 +387,7 @@ model EnvioFirma {
   contratoId   String      @map("contrato_id")
   nombre       String
   email        String
+  tipo         TipoFirma?
   token        String      @unique @default(uuid())
   fechaEnvio   DateTime    @map("fecha_envio") @default(now())
   fechaFirmado DateTime?   @map("fecha_firmado")

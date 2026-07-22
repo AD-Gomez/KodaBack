@@ -4,6 +4,7 @@ import sharp from 'sharp';
 
 import { logger } from '../logger.js';
 import { getObjectBuffer, getObjectKey } from '../storage/s3Storage.js';
+import { decodeHtmlEntities } from '../utils/sanitizeRichText.js';
 
 export interface CedulaPdfInput {
   contractId: string;
@@ -89,6 +90,28 @@ function renderSignature(
     .text(signature.nombre, x, signatureY + signatureHeight + 24, { width, align: 'center' });
 }
 
+function renderAttorneySignature(
+  doc: PDFKit.PDFDocument,
+  signature: NonNullable<CedulaPdfInput['firmasCapturadas']>[number],
+  x: number,
+  y: number,
+  width: number,
+) {
+  const signatureBuffer = parseDataUrl(signature.firmaDataUrl);
+  if (!signatureBuffer) return;
+
+  try {
+    // En el documento de referencia la rúbrica de la abogada encabeza el
+    // contrato sin recuadro; su nombre, cargo e IPSA forman parte del contenido.
+    doc.image(signatureBuffer, x, y, {
+      fit: [width, 82],
+      valign: 'center',
+    });
+  } catch (err) {
+    logger.warn({ err, nombre: signature.nombre }, 'No se pudo incrustar la firma de la abogada');
+  }
+}
+
 async function fetchAsPngBuffer(reference: string): Promise<Buffer | null> {
   try {
     const raw = getObjectKey(reference)
@@ -134,26 +157,6 @@ const CONTRACT_BODY_FONT = 'Times-Roman';
 const CONTRACT_BOLD_FONT = 'Times-Bold';
 const CONTRACT_ITALIC_FONT = 'Times-Italic';
 const CONTRACT_BOLD_ITALIC_FONT = 'Times-BoldItalic';
-
-function decodeEntities(value: string): string {
-  let decoded = value;
-  for (let i = 0; i < 5; i++) {
-    const next = decoded
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'")
-      .replace(/&#(\d+);/g, (_m, code: string) => {
-        const n = Number(code);
-        return Number.isFinite(n) ? String.fromCharCode(n) : '';
-      });
-    if (next === decoded) break;
-    decoded = next;
-  }
-  return decoded;
-}
 
 function chooseContractFont(format: InlineFormat): string {
   if (format.bold && format.italic) return CONTRACT_BOLD_ITALIC_FONT;
@@ -211,7 +214,7 @@ function formatPlainContractContent(value: string): string {
 }
 
 function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
-  const source = decodeEntities(html).replace(/\r\n/g, '\n');
+  const source = decodeHtmlEntities(html).replace(/\r\n/g, '\n');
   const text = /<\/?[a-z][^>]*>/i.test(source) ? source : formatPlainContractContent(source);
   const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
   const tagStack: string[] = [];
@@ -411,7 +414,7 @@ function parseInlineSegments(line: string): Array<{ text: string; format: Inline
 
 export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buffer> {
   const doc = new PDFDocument({
-    size: 'LETTER',
+    size: 'A4',
     margins: { top: 60, bottom: 60, left: 60, right: 60 },
     info: {
       Title: input.contractTitulo || 'Contrato de arrendamiento',
@@ -449,8 +452,8 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   if (firmaAbogada) {
     const attorneyY = doc.y;
     const attorneyX = doc.page.margins.left;
-    renderSignature(doc, firmaAbogada, attorneyX, attorneyY, signatureWidth);
-    doc.y = attorneyY + 180;
+    renderAttorneySignature(doc, firmaAbogada, attorneyX, attorneyY, signatureWidth);
+    doc.y = attorneyY + 96;
   }
 
   // --- Texto del contrato aceptado ---
