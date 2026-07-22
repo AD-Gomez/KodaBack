@@ -414,23 +414,6 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk as Buffer));
 
-  // --- Texto del contrato aceptado ---
-  if (input.contenido && input.contenido.trim()) {
-    renderContractContent(doc, input.contenido);
-    doc.moveDown(0.5);
-  }
-
-  // --- Página final de firmas ---
-  doc.addPage();
-  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Firmas del contrato');
-  doc.moveDown(0.35);
-  doc
-    .fontSize(10)
-    .fillColor('#475569')
-    .font('Helvetica')
-    .text('Firmas electrónicas capturadas de las partes del contrato.', { align: 'left' });
-  doc.moveDown(1.2);
-
   const firmasCapturadas = input.firmasCapturadas?.filter((firma) => firma.firmaDataUrl) ?? [];
   const signatures = (
     firmasCapturadas.length
@@ -449,23 +432,42 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
       const order = { ABOGADA: 0, ARRENDADOR: 1, ARRENDATARIO: 2, FIRMANTE: 3 } as const;
       return order[a.rol] - order[b.rol];
     });
-  const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
-  const signatureY = doc.y;
   const firmaAbogada = signatures.find((signature) => signature.rol === 'ABOGADA');
   const firmasPartes = signatures.filter((signature) => signature.rol !== 'ABOGADA');
+  const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
 
+  // Como en el contrato de referencia, la firma de la abogada encabeza el documento.
   if (firmaAbogada) {
-    const attorneyX = doc.page.margins.left + signatureWidth / 2 + 12;
-    renderSignature(doc, firmaAbogada, attorneyX, signatureY, signatureWidth);
+    const attorneyY = doc.y;
+    const attorneyX = doc.page.margins.left;
+    renderSignature(doc, firmaAbogada, attorneyX, attorneyY, signatureWidth);
+    doc.y = attorneyY + 180;
   }
 
-  const partyStartY = signatureY + (firmaAbogada ? 195 : 0);
+  // --- Texto del contrato aceptado ---
+  if (input.contenido && input.contenido.trim()) {
+    renderContractContent(doc, input.contenido);
+    doc.moveDown(0.5);
+  }
+
+  // --- Página final de firmas ---
+  doc.addPage();
+  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Firmas del contrato');
+  doc.moveDown(0.35);
+  doc
+    .fontSize(10)
+    .fillColor('#475569')
+    .font('Helvetica')
+    .text('Firmas electrónicas capturadas de las partes del contrato.', { align: 'left' });
+  doc.moveDown(1.2);
+
+  const signatureY = doc.y;
   for (let i = 0; i < firmasPartes.length; i++) {
     const signature = firmasPartes[i]!;
     const column = i % 2;
     const row = Math.floor(i / 2);
     const x = doc.page.margins.left + column * (signatureWidth + 24);
-    const y = partyStartY + row * 195;
+    const y = signatureY + row * 195;
     renderSignature(doc, signature, x, y, signatureWidth);
   }
 

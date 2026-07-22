@@ -150,6 +150,7 @@ model Notificacion {
   enlace      String?
   clave       String
   leidaAt     DateTime? @map("leida_at")
+  correoEnviadoAt DateTime? @map("correo_enviado_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -157,6 +158,15 @@ model Notificacion {
   @@unique([usuarioId, clave])
   @@index([usuarioId, leidaAt, createdAt])
   @@map("notificaciones")
+}
+
+model ConfiguracionSistema {
+  id                     String   @id
+  diasAvisoVencimiento   Int      @default(15) @map("dias_aviso_vencimiento")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracion_sistema")
 }
 
 model RefreshToken {

@@ -18,7 +18,12 @@ const plantillaIdSchema = z.object({
   id: z.string().trim().min(1).max(100),
 });
 
+const notificationSettingsSchema = z.object({
+  diasAvisoVencimiento: z.coerce.number().int().min(1).max(365),
+});
+
 const PLANTILLA_ID = 'principal';
+const CONFIGURACION_SISTEMA_ID = 'principal';
 const plantillaPorDefecto = {
   id: PLANTILLA_ID,
   titulo: 'Contrato de arrendamiento',
@@ -40,6 +45,28 @@ export function createConfiguracionRouter(): Router {
       orderBy: [{ id: 'asc' }, { updatedAt: 'desc' }],
     });
     res.json({ success: true, data: plantillas.length ? plantillas : [plantillaPorDefecto] });
+  }));
+
+  router.get('/notificaciones', asyncHandler(async (_req, res) => {
+    const settings = await prisma.configuracionSistema.findUnique({
+      where: { id: CONFIGURACION_SISTEMA_ID },
+    });
+    res.json({
+      success: true,
+      data: { diasAvisoVencimiento: settings?.diasAvisoVencimiento ?? 15 },
+    });
+  }));
+
+  router.put('/notificaciones', requireRoles('ADMIN'), validate(notificationSettingsSchema), asyncHandler(async (req, res) => {
+    const settings = await prisma.configuracionSistema.upsert({
+      where: { id: CONFIGURACION_SISTEMA_ID },
+      create: { id: CONFIGURACION_SISTEMA_ID, diasAvisoVencimiento: req.body.diasAvisoVencimiento },
+      update: { diasAvisoVencimiento: req.body.diasAvisoVencimiento },
+    });
+    res.json({
+      success: true,
+      data: { diasAvisoVencimiento: settings.diasAvisoVencimiento },
+    });
   }));
 
   router.put('/contrato', requireRoles('ADMIN'), validate(plantillaContratoSchema), asyncHandler(async (req, res) => {
