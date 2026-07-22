@@ -153,10 +153,13 @@ const DEFAULT_FORMAT: InlineFormat = { bold: false, italic: false, underline: fa
 
 const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'blockquote']);
 const HEADING_TAGS = new Set(['h1', 'h2', 'h3']);
-const CONTRACT_BODY_FONT = 'Times-Roman';
-const CONTRACT_BOLD_FONT = 'Times-Bold';
-const CONTRACT_ITALIC_FONT = 'Times-Italic';
-const CONTRACT_BOLD_ITALIC_FONT = 'Times-BoldItalic';
+// La vista previa pública utiliza Poppins a 13 px. Helvetica es la fuente
+// sans-serif integrada de PDFKit más cercana y evita que la vista y el PDF
+// parezcan documentos distintos.
+const CONTRACT_BODY_FONT = 'Helvetica';
+const CONTRACT_BOLD_FONT = 'Helvetica-Bold';
+const CONTRACT_ITALIC_FONT = 'Helvetica-Oblique';
+const CONTRACT_BOLD_ITALIC_FONT = 'Helvetica-BoldOblique';
 
 function chooseContractFont(format: InlineFormat): string {
   if (format.bold && format.italic) return CONTRACT_BOLD_ITALIC_FONT;
@@ -239,9 +242,10 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     if (!trimmed) return;
 
     const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
+    // Equivalente a la vista previa: 13 px (≈10 pt) y line-height 1.75.
     const baseSize =
-      headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
-    const lineGap = headingTag ? 2 : Math.round(baseSize * 0.45);
+      headingTag === 'h1' ? 14 : headingTag === 'h2' ? 12 : headingTag === 'h3' ? 10.5 : 10;
+    const lineGap = headingTag ? 3 : 7;
     const isBlockquote = blockTag === 'blockquote';
     const listType = inList();
 
