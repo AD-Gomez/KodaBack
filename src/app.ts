@@ -35,10 +35,9 @@ export function createApp(): Application {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Logging
+ 
   app.use(httpLogger);
 
-  // Health check
   app.get('/health', (_req, res) => {
     res.json({
       success: true,
