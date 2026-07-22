@@ -230,6 +230,7 @@ export interface AddEnvioFirmaInput {
   contratoId: string;
   nombre: string;
   email: string;
+  tipo?: TipoFirma;
   creadoPorNombre?: string;
 }
 
@@ -261,6 +262,7 @@ export class AddEnvioFirmaUseCase {
       contratoId: input.contratoId,
       nombre: input.nombre,
       email: input.email,
+      tipo: input.tipo,
     });
 
     if (contrato.estado === 'BORRADOR') {
@@ -452,7 +454,9 @@ export class EnsureEnvioPdfUseCase {
     const firmasCapturadas = (contrato.envios ?? [])
       .filter((firmante) => firmante.fechaFirmado)
       .map((firmante) => {
-        const tipo = tipoPorEmail.get(firmante.email.trim().toLowerCase());
+        // Las solicitudes nuevas conservan el rol explícitamente. El correo queda
+        // como respaldo para contratos creados antes de añadir EnvioFirma.tipo.
+        const tipo = firmante.tipo ?? tipoPorEmail.get(firmante.email.trim().toLowerCase());
         const rol: 'ABOGADA' | 'ARRENDADOR' | 'ARRENDATARIO' | 'FIRMANTE' =
           tipo === 'ABOGADO'
             ? 'ABOGADA'
