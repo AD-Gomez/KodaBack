@@ -17,7 +17,7 @@ export const listContratosQuerySchema = z.object({
 export const createContratoSchema = z.object({
   departamentoId: z.string().uuid(),
   arrendatarioId: z.string().uuid(),
-  version: z.coerce.number().int().min(1).optional().default(1),
+  version: z.coerce.number().int().min(1).optional(),
   fechaInicio: dateString,
   fechaFin: dateString,
   estado: estadoContratoEnum.optional().default('BORRADOR'),

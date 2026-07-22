@@ -75,18 +75,39 @@ export class CreateContratoUseCase {
       throw new ValidationError('La fecha de fin debe ser posterior a la fecha de inicio');
     }
 
-    const contrato = await this.repository.create({
-      departamento: { connect: { id: input.departamentoId } },
-      arrendatario: { connect: { id: input.arrendatarioId } },
-      version: input.version ?? 1,
-      fechaInicio: new Date(input.fechaInicio),
-      fechaFin: new Date(input.fechaFin),
-      estado: input.estado ?? 'BORRADOR',
-      titulo: input.titulo,
-      contenido: input.contenido ? sanitizeRichText(input.contenido) : undefined,
-      url: input.url,
-      creadoPor: input.creadoPorId ? { connect: { id: input.creadoPorId } } : undefined,
+    const contratosExistentes = await this.repository.findMany({
+      departamentoId: input.departamentoId,
     });
+    const versionSiguiente =
+      Math.max(0, ...contratosExistentes.map((contrato) => contrato.version)) + 1;
+
+    let contrato;
+    try {
+      contrato = await this.repository.create({
+        departamento: { connect: { id: input.departamentoId } },
+        arrendatario: { connect: { id: input.arrendatarioId } },
+        version: input.version ?? versionSiguiente,
+        fechaInicio: new Date(input.fechaInicio),
+        fechaFin: new Date(input.fechaFin),
+        estado: input.estado ?? 'BORRADOR',
+        titulo: input.titulo,
+        contenido: input.contenido ? sanitizeRichText(input.contenido) : undefined,
+        url: input.url,
+        creadoPor: input.creadoPorId ? { connect: { id: input.creadoPorId } } : undefined,
+      });
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictError(
+          'Ya existe un contrato con esa versión para el departamento. Actualiza e inténtalo nuevamente.',
+        );
+      }
+      throw error;
+    }
 
     if (input.clausulasIniciales && input.clausulasIniciales.length > 0) {
       for (let i = 0; i < input.clausulasIniciales.length; i++) {
