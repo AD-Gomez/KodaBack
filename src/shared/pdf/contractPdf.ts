@@ -130,26 +130,36 @@ const DEFAULT_FORMAT: InlineFormat = { bold: false, italic: false, underline: fa
 
 const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'blockquote']);
 const HEADING_TAGS = new Set(['h1', 'h2', 'h3']);
+const CONTRACT_BODY_FONT = 'Times-Roman';
+const CONTRACT_BOLD_FONT = 'Times-Bold';
+const CONTRACT_ITALIC_FONT = 'Times-Italic';
+const CONTRACT_BOLD_ITALIC_FONT = 'Times-BoldItalic';
 
 function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_m, code: string) => {
-      const n = Number(code);
-      return Number.isFinite(n) ? String.fromCharCode(n) : '';
-    });
+  let decoded = value;
+  for (let i = 0; i < 5; i++) {
+    const next = decoded
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/&#(\d+);/g, (_m, code: string) => {
+        const n = Number(code);
+        return Number.isFinite(n) ? String.fromCharCode(n) : '';
+      });
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded;
 }
 
-function chooseFont(format: InlineFormat, boldFont: string, italicFont: string): string {
-  if (format.bold && format.italic) return 'Helvetica-BoldOblique';
-  if (format.bold) return boldFont;
-  if (format.italic) return italicFont;
-  return 'Helvetica';
+function chooseContractFont(format: InlineFormat): string {
+  if (format.bold && format.italic) return CONTRACT_BOLD_ITALIC_FONT;
+  if (format.bold) return CONTRACT_BOLD_FONT;
+  if (format.italic) return CONTRACT_ITALIC_FONT;
+  return CONTRACT_BODY_FONT;
 }
 
 const CLAUSE_ORDINALS =
@@ -228,6 +238,7 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
     const baseSize =
       headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
+    const lineGap = headingTag ? 2 : Math.round(baseSize * 0.45);
     const isBlockquote = blockTag === 'blockquote';
     const listType = inList();
 
@@ -246,40 +257,38 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
       listIndex += 1;
       const marker = listType === 'ol' ? `${listIndex}.` : '•';
       doc
-        .font('Helvetica')
+        .font(CONTRACT_BODY_FONT)
         .fontSize(baseSize)
         .fillColor('#1e293b')
-        .text(marker, indent, doc.y, { continued: true, width: 12 });
+        .text(marker, indent, doc.y, { continued: true, width: 12, lineGap });
       indent += 14;
     }
 
     const lines = trimmed.split('\n');
-    lines.forEach((line, lineIdx) => {
+    lines.forEach((line) => {
       if (!line) {
         doc.moveDown(0.3);
         return;
       }
       const segments = parseInlineSegments(line);
-      const isLastLine = lineIdx === lines.length - 1;
-      let first = true;
-      for (const segment of segments) {
-        const font = headingTag
-          ? 'Helvetica-Bold'
-          : chooseFont(segment.format, 'Helvetica-Bold', 'Helvetica-Oblique');
-        doc
-          .font(font)
-          .fontSize(baseSize)
-          .fillColor(headingTag ? '#0f172a' : isBlockquote ? '#475569' : '#1e293b');
-        doc.text(segment.text, indent, doc.y, {
-          continued: !first || !isLastLine || segments.length > 1,
+      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+        const segment = segments[segmentIndex]!;
+        const options = {
+          continued: segmentIndex < segments.length - 1,
           width: doc.page.width - doc.page.margins.right - indent + widthOffset,
           underline: segment.format.underline,
-        });
-        first = false;
+          lineGap,
+        };
+        doc
+          .font(headingTag ? CONTRACT_BOLD_FONT : chooseContractFont(segment.format))
+          .fontSize(baseSize)
+          .fillColor(headingTag ? '#0f172a' : isBlockquote ? '#475569' : '#1e293b');
+        if (segmentIndex === 0) doc.text(segment.text, indent, doc.y, options);
+        else doc.text(segment.text, options);
       }
     });
 
-    doc.moveDown(0.4);
+    doc.moveDown(0.5);
   };
 
   let lastIndex = 0;
