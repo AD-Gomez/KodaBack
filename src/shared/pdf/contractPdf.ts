@@ -38,22 +38,17 @@ function renderSignature(
   y: number,
   width: number,
 ) {
-  const signatureHeight = 100;
+  const signatureHeight = 76;
   const signatureBuffer = parseDataUrl(signature.firmaDataUrl);
 
   const signatureY = y;
-  doc
-    .save()
-    .lineWidth(1)
-    .strokeColor('#cbd5e1')
-    .rect(x, signatureY, width, signatureHeight)
-    .stroke()
-    .restore();
 
   if (signatureBuffer) {
     try {
-      doc.image(signatureBuffer, x + 6, signatureY + 6, {
-        fit: [width - 12, signatureHeight - 12],
+      // La firma de las partes se presenta limpia, como en un contrato físico:
+      // rúbrica, rol y nombre. No se dibujan recuadros ni huellas.
+      doc.image(signatureBuffer, x, signatureY, {
+        fit: [width, signatureHeight],
         align: 'center',
         valign: 'center',
       });
@@ -62,32 +57,16 @@ function renderSignature(
     }
   }
 
-  if (signature.fechaFirmado) {
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor('#64748b')
-      .text(
-        `Firmado: ${formatDateTime(signature.fechaFirmado)}`,
-        x,
-        signatureY + signatureHeight + 60,
-        {
-          width,
-          align: 'center',
-        },
-      );
-  }
-
   doc
     .font('Helvetica-Bold')
     .fontSize(11)
     .fillColor('#0f172a')
-    .text(signature.rol, x, signatureY + signatureHeight + 9, { width, align: 'center' });
+    .text(signature.rol, x, signatureY + signatureHeight + 8, { width, align: 'center' });
   doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor('#475569')
-    .text(signature.nombre, x, signatureY + signatureHeight + 24, { width, align: 'center' });
+    .font('Helvetica-Bold')
+    .fontSize(10)
+    .fillColor('#0f172a')
+    .text(signature.nombre, x, signatureY + signatureHeight + 26, { width, align: 'center' });
 }
 
 function renderAttorneySignature(
@@ -135,16 +114,6 @@ function parseDataUrl(dataUrl: string): Buffer | null {
   const match = /^data:image\/[a-zA-Z+]+;base64,(.+)$/.exec(dataUrl);
   if (!match) return null;
   return Buffer.from(match[1]!, 'base64');
-}
-
-function formatDateTime(d: Date): string {
-  return d.toLocaleString('es-MX', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 type InlineFormat = { bold: boolean; italic: boolean; underline: boolean };
