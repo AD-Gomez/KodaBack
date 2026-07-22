@@ -217,7 +217,12 @@ function formatPlainContractContent(value: string): string {
 }
 
 function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
-  const source = decodeHtmlEntities(html).replace(/\r\n/g, '\n');
+  // En el navegador los saltos que vienen dentro del texto (por ejemplo, al
+  // pegar un contrato desde Word) se colapsan como espacios. Solo <br> y los
+  // elementos de bloque deben forzar una línea nueva. Si convertimos cada
+  // salto de origen en una línea del PDF, queda una columna angosta y mucho
+  // espacio vacío a la derecha.
+  const source = decodeHtmlEntities(html).replace(/\s*[\r\n]+\s*/g, ' ');
   const text = /<\/?[a-z][^>]*>/i.test(source) ? source : formatPlainContractContent(source);
   const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
   const tagStack: string[] = [];
@@ -278,6 +283,9 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
         return;
       }
       const segments = parseInlineSegments(line);
+      // Es normal recibir marcas vacías, como <b><br></b>, desde el editor.
+      // No son texto y jamás deben aparecer impresas como "<b>".
+      if (segments.length === 0) return;
       for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
         const segment = segments[segmentIndex]!;
         const options = {
@@ -354,7 +362,7 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
   flushParagraph(tagStack[tagStack.length - 1] ?? null);
 }
 
-function parseInlineSegments(line: string): Array<{ text: string; format: InlineFormat }> {
+export function parseInlineSegments(line: string): Array<{ text: string; format: InlineFormat }> {
   const segments: Array<{ text: string; format: InlineFormat }> = [];
   const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
   const formatStack: InlineFormat[] = [DEFAULT_FORMAT];
@@ -410,9 +418,6 @@ function parseInlineSegments(line: string): Array<{ text: string; format: Inline
   if (tail) buffer += tail;
   flush();
 
-  if (segments.length === 0) {
-    segments.push({ text: line, format: { ...DEFAULT_FORMAT } });
-  }
   return segments;
 }
 
