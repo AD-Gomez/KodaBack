@@ -39,6 +39,7 @@ export interface ContratoRepository {
     contratoId: string;
     nombre: string;
     email: string;
+    tipo?: TipoFirma;
     token?: string;
     estado?: EstadoFirma;
   }): Promise<EnvioFirma>;

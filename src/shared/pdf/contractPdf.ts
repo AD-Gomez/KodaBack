@@ -4,6 +4,7 @@ import sharp from 'sharp';
 
 import { logger } from '../logger.js';
 import { getObjectBuffer, getObjectKey } from '../storage/s3Storage.js';
+import { decodeHtmlEntities } from '../utils/sanitizeRichText.js';
 
 export interface CedulaPdfInput {
   contractId: string;
@@ -89,6 +90,28 @@ function renderSignature(
     .text(signature.nombre, x, signatureY + signatureHeight + 24, { width, align: 'center' });
 }
 
+function renderAttorneySignature(
+  doc: PDFKit.PDFDocument,
+  signature: NonNullable<CedulaPdfInput['firmasCapturadas']>[number],
+  x: number,
+  y: number,
+  width: number,
+) {
+  const signatureBuffer = parseDataUrl(signature.firmaDataUrl);
+  if (!signatureBuffer) return;
+
+  try {
+    // En el documento de referencia la rúbrica de la abogada encabeza el
+    // contrato sin recuadro; su nombre, cargo e IPSA forman parte del contenido.
+    doc.image(signatureBuffer, x, y, {
+      fit: [width, 82],
+      valign: 'center',
+    });
+  } catch (err) {
+    logger.warn({ err, nombre: signature.nombre }, 'No se pudo incrustar la firma de la abogada');
+  }
+}
+
 async function fetchAsPngBuffer(reference: string): Promise<Buffer | null> {
   try {
     const raw = getObjectKey(reference)
@@ -130,26 +153,16 @@ const DEFAULT_FORMAT: InlineFormat = { bold: false, italic: false, underline: fa
 
 const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'blockquote']);
 const HEADING_TAGS = new Set(['h1', 'h2', 'h3']);
+const CONTRACT_BODY_FONT = 'Times-Roman';
+const CONTRACT_BOLD_FONT = 'Times-Bold';
+const CONTRACT_ITALIC_FONT = 'Times-Italic';
+const CONTRACT_BOLD_ITALIC_FONT = 'Times-BoldItalic';
 
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_m, code: string) => {
-      const n = Number(code);
-      return Number.isFinite(n) ? String.fromCharCode(n) : '';
-    });
-}
-
-function chooseFont(format: InlineFormat, boldFont: string, italicFont: string): string {
-  if (format.bold && format.italic) return 'Helvetica-BoldOblique';
-  if (format.bold) return boldFont;
-  if (format.italic) return italicFont;
-  return 'Helvetica';
+function chooseContractFont(format: InlineFormat): string {
+  if (format.bold && format.italic) return CONTRACT_BOLD_ITALIC_FONT;
+  if (format.bold) return CONTRACT_BOLD_FONT;
+  if (format.italic) return CONTRACT_ITALIC_FONT;
+  return CONTRACT_BODY_FONT;
 }
 
 const CLAUSE_ORDINALS =
@@ -201,7 +214,7 @@ function formatPlainContractContent(value: string): string {
 }
 
 function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
-  const source = decodeEntities(html).replace(/\r\n/g, '\n');
+  const source = decodeHtmlEntities(html).replace(/\r\n/g, '\n');
   const text = /<\/?[a-z][^>]*>/i.test(source) ? source : formatPlainContractContent(source);
   const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
   const tagStack: string[] = [];
@@ -228,6 +241,7 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
     const baseSize =
       headingTag === 'h1' ? 16 : headingTag === 'h2' ? 14 : headingTag === 'h3' ? 12 : 11;
+    const lineGap = headingTag ? 2 : Math.round(baseSize * 0.45);
     const isBlockquote = blockTag === 'blockquote';
     const listType = inList();
 
@@ -246,40 +260,38 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
       listIndex += 1;
       const marker = listType === 'ol' ? `${listIndex}.` : '•';
       doc
-        .font('Helvetica')
+        .font(CONTRACT_BODY_FONT)
         .fontSize(baseSize)
         .fillColor('#1e293b')
-        .text(marker, indent, doc.y, { continued: true, width: 12 });
+        .text(marker, indent, doc.y, { continued: true, width: 12, lineGap });
       indent += 14;
     }
 
     const lines = trimmed.split('\n');
-    lines.forEach((line, lineIdx) => {
+    lines.forEach((line) => {
       if (!line) {
         doc.moveDown(0.3);
         return;
       }
       const segments = parseInlineSegments(line);
-      const isLastLine = lineIdx === lines.length - 1;
-      let first = true;
-      for (const segment of segments) {
-        const font = headingTag
-          ? 'Helvetica-Bold'
-          : chooseFont(segment.format, 'Helvetica-Bold', 'Helvetica-Oblique');
-        doc
-          .font(font)
-          .fontSize(baseSize)
-          .fillColor(headingTag ? '#0f172a' : isBlockquote ? '#475569' : '#1e293b');
-        doc.text(segment.text, indent, doc.y, {
-          continued: !first || !isLastLine || segments.length > 1,
+      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+        const segment = segments[segmentIndex]!;
+        const options = {
+          continued: segmentIndex < segments.length - 1,
           width: doc.page.width - doc.page.margins.right - indent + widthOffset,
           underline: segment.format.underline,
-        });
-        first = false;
+          lineGap,
+        };
+        doc
+          .font(headingTag ? CONTRACT_BOLD_FONT : chooseContractFont(segment.format))
+          .fontSize(baseSize)
+          .fillColor(headingTag ? '#0f172a' : isBlockquote ? '#475569' : '#1e293b');
+        if (segmentIndex === 0) doc.text(segment.text, indent, doc.y, options);
+        else doc.text(segment.text, options);
       }
     });
 
-    doc.moveDown(0.4);
+    doc.moveDown(0.5);
   };
 
   let lastIndex = 0;
@@ -402,7 +414,7 @@ function parseInlineSegments(line: string): Array<{ text: string; format: Inline
 
 export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buffer> {
   const doc = new PDFDocument({
-    size: 'LETTER',
+    size: 'A4',
     margins: { top: 60, bottom: 60, left: 60, right: 60 },
     info: {
       Title: input.contractTitulo || 'Contrato de arrendamiento',
@@ -413,23 +425,6 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
 
   const chunks: Buffer[] = [];
   doc.on('data', (chunk) => chunks.push(chunk as Buffer));
-
-  // --- Texto del contrato aceptado ---
-  if (input.contenido && input.contenido.trim()) {
-    renderContractContent(doc, input.contenido);
-    doc.moveDown(0.5);
-  }
-
-  // --- Página final de firmas ---
-  doc.addPage();
-  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Firmas del contrato');
-  doc.moveDown(0.35);
-  doc
-    .fontSize(10)
-    .fillColor('#475569')
-    .font('Helvetica')
-    .text('Firmas electrónicas capturadas de las partes del contrato.', { align: 'left' });
-  doc.moveDown(1.2);
 
   const firmasCapturadas = input.firmasCapturadas?.filter((firma) => firma.firmaDataUrl) ?? [];
   const signatures = (
@@ -449,23 +444,42 @@ export async function buildSignedContractPdf(input: CedulaPdfInput): Promise<Buf
       const order = { ABOGADA: 0, ARRENDADOR: 1, ARRENDATARIO: 2, FIRMANTE: 3 } as const;
       return order[a.rol] - order[b.rol];
     });
-  const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
-  const signatureY = doc.y;
   const firmaAbogada = signatures.find((signature) => signature.rol === 'ABOGADA');
   const firmasPartes = signatures.filter((signature) => signature.rol !== 'ABOGADA');
+  const signatureWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 24) / 2;
 
+  // Como en el contrato de referencia, la firma de la abogada encabeza el documento.
   if (firmaAbogada) {
-    const attorneyX = doc.page.margins.left + signatureWidth / 2 + 12;
-    renderSignature(doc, firmaAbogada, attorneyX, signatureY, signatureWidth);
+    const attorneyY = doc.y;
+    const attorneyX = doc.page.margins.left;
+    renderAttorneySignature(doc, firmaAbogada, attorneyX, attorneyY, signatureWidth);
+    doc.y = attorneyY + 96;
   }
 
-  const partyStartY = signatureY + (firmaAbogada ? 195 : 0);
+  // --- Texto del contrato aceptado ---
+  if (input.contenido && input.contenido.trim()) {
+    renderContractContent(doc, input.contenido);
+    doc.moveDown(0.5);
+  }
+
+  // --- Página final de firmas ---
+  doc.addPage();
+  doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text('Firmas del contrato');
+  doc.moveDown(0.35);
+  doc
+    .fontSize(10)
+    .fillColor('#475569')
+    .font('Helvetica')
+    .text('Firmas electrónicas capturadas de las partes del contrato.', { align: 'left' });
+  doc.moveDown(1.2);
+
+  const signatureY = doc.y;
   for (let i = 0; i < firmasPartes.length; i++) {
     const signature = firmasPartes[i]!;
     const column = i % 2;
     const row = Math.floor(i / 2);
     const x = doc.page.margins.left + column * (signatureWidth + 24);
-    const y = partyStartY + row * 195;
+    const y = signatureY + row * 195;
     renderSignature(doc, signature, x, y, signatureWidth);
   }
 

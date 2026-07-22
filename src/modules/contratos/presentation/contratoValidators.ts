@@ -65,6 +65,7 @@ export const updateFirmaEstadoSchema = z.object({
 export const envioFirmaSchema = z.object({
   nombre: z.string().min(1).max(150),
   email: z.string().email(),
+  tipo: tipoFirmaEnum.optional(),
 });
 
 export const documentoContratoSchema = z.object({

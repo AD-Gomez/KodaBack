@@ -1,10 +1,12 @@
 import { env } from './config/env.js';
-import { connectDatabase, disconnectDatabase } from './config/database.js';
+import { connectDatabase, disconnectDatabase, prisma } from './config/database.js';
+import { startContractExpirationReminderScheduler } from './modules/contratos/application/ContractExpirationReminderService.js';
 import { createApp } from './app.js';
 import { logger } from './shared/logger.js';
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
+  const stopContractExpirationReminders = startContractExpirationReminderScheduler(prisma);
 
   const app = createApp();
   const server = app.listen(env.PORT, () => {
@@ -16,6 +18,7 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Cerrando servidor...');
     server.close(async () => {
+      stopContractExpirationReminders();
       await disconnectDatabase();
       logger.info('Servidor cerrado correctamente');
       process.exit(0);
