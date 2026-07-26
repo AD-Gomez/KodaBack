@@ -14,6 +14,17 @@ describe('sanitizeRichText', () => {
       'alerta<p>Contrato</p>',
     );
   });
+
+  it('conserva solamente la alineación de texto permitida en párrafos', () => {
+    expect(
+      sanitizeRichText(
+        '<p style="text-align: justify; color: red" onclick="alerta()">Contrato</p>',
+      ),
+    ).toBe('<p style="text-align: justify">Contrato</p>');
+    expect(sanitizeRichText('<p style="background: url(javascript:alerta())">Contrato</p>')).toBe(
+      '<p>Contrato</p>',
+    );
+  });
 });
 
 describe('decodeHtmlEntities', () => {

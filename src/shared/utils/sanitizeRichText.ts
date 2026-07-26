@@ -15,6 +15,8 @@ const ALLOWED_TAGS = new Set([
   'blockquote',
 ]);
 
+const ALLOWED_TEXT_ALIGN = new Set(['left', 'right', 'center', 'justify']);
+
 function decodeCodePoint(entity: string, code: string, radix: number): string {
   const value = Number.parseInt(code, radix);
   if (
@@ -54,8 +56,21 @@ export function decodeHtmlEntities(value: string): string {
 export function sanitizeRichText(value: string): string {
   return decodeHtmlEntities(value)
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi, (_tag, closing: string, name: string) => {
-      const tag = name.toLowerCase();
-      return ALLOWED_TAGS.has(tag) ? `<${closing ? '/' : ''}${tag}>` : '';
-    });
+    .replace(
+      /<\s*(\/?)\s*([a-z0-9]+)(?:\s+([^>]*))?>/gi,
+      (_tag, closing: string, name: string, attributes = '') => {
+        const tag = name.toLowerCase();
+        if (!ALLOWED_TAGS.has(tag)) return '';
+        if (closing || tag !== 'p') return `<${closing ? '/' : ''}${tag}>`;
+
+        const style = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i.exec(attributes);
+        const textAlign = /(?:^|;)\s*text-align\s*:\s*(left|right|center|justify)\s*(?:;|$)/i
+          .exec(style?.[1] ?? style?.[2] ?? style?.[3] ?? '')?.[1]
+          ?.toLowerCase();
+
+        return textAlign && ALLOWED_TEXT_ALIGN.has(textAlign)
+          ? `<p style="text-align: ${textAlign}">`
+          : '<p>';
+      },
+    );
 }
