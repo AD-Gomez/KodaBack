@@ -5,6 +5,7 @@ import { authMiddleware } from '../../../shared/middleware/authMiddleware.js';
 import { validate } from '../../../shared/middleware/validate.js';
 
 import {
+  AddReparacionFotoUseCase,
   CreateReparacionUseCase,
   CreateServicioUseCase,
   DeleteReparacionUseCase,
@@ -14,6 +15,7 @@ import {
   GetServicioUseCase,
   ListReparacionesUseCase,
   ListServiciosUseCase,
+  RemoveReparacionFotoUseCase,
   UpdateReparacionUseCase,
   UpdateServicioUseCase,
 } from '../application/ReparacionUseCases.js';
@@ -27,8 +29,11 @@ import {
   idParamSchema,
   listReparacionesQuerySchema,
   listServiciosQuerySchema,
+  reparacionFotoIdParamSchema,
+  reparacionPdfQuerySchema,
   updateReparacionSchema,
   updateServicioSchema,
+  uploadReparacionFotoSchema,
 } from './reparacionValidators.js';
 
 export function createReparacionesRouter(): Router {
@@ -45,6 +50,8 @@ export function createReparacionesRouter(): Router {
     new UpdateReparacionUseCase(reparacionRepo),
     new DeleteReparacionUseCase(reparacionRepo),
     new GetReparacionStatsUseCase(reparacionRepo),
+    new AddReparacionFotoUseCase(reparacionRepo),
+    new RemoveReparacionFotoUseCase(reparacionRepo),
     new ListServiciosUseCase(servicioRepo),
     new GetServicioUseCase(servicioRepo),
     new CreateServicioUseCase(servicioRepo),
@@ -59,6 +66,27 @@ export function createReparacionesRouter(): Router {
   router.post('/', validate(createReparacionSchema), controller.create);
   router.put('/:id', validate(idParamSchema, 'params'), validate(updateReparacionSchema), controller.update);
   router.delete('/:id', validate(idParamSchema, 'params'), controller.delete);
+
+  // Manifiesto PDF de una reparación
+  router.get(
+    '/:id/pdf',
+    validate(idParamSchema, 'params'),
+    validate(reparacionPdfQuerySchema, 'query'),
+    controller.pdf,
+  );
+
+  // Evidencia fotográfica de una reparación
+  router.post(
+    '/:id/fotos',
+    validate(idParamSchema, 'params'),
+    validate(uploadReparacionFotoSchema),
+    controller.addFoto,
+  );
+  router.delete(
+    '/:id/fotos/:fotoId',
+    validate(reparacionFotoIdParamSchema, 'params'),
+    controller.removeFoto,
+  );
 
   // Servicios activos
   router.get('/servicios/all', validate(listServiciosQuerySchema, 'query'), controller.listServicios);

@@ -457,10 +457,26 @@ model Reparacion {
 
   departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
   solicitante  Usuario?    @relation("ReparacionSolicitante", fields: [solicitanteId], references: [id], onDelete: SetNull)
+  fotos        FotoReparacion[]
 
   @@index([estado])
   @@index([departamentoId])
   @@map("reparaciones")
+}
+
+model FotoReparacion {
+  id            String   @id @default(uuid())
+  reparacionId  String   @map("reparacion_id")
+  nombreArchivo String   @map("nombre_archivo")
+  mimeType      String   @map("mime_type")
+  datos         String   @db.Text
+  observacion   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  reparacion Reparacion @relation(fields: [reparacionId], references: [id], onDelete: Cascade)
+
+  @@index([reparacionId])
+  @@map("fotos_reparacion")
 }
 
 model ServicioActivo {

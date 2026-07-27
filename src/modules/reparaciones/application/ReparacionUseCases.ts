@@ -1,6 +1,7 @@
 import {
   type EstadoReparacion,
   type EstadoServicio,
+  type FotoReparacion,
   type FrecuenciaServicio,
   type PrioridadReparacion,
   type ReparacionWithRelations,
@@ -201,5 +202,42 @@ export class DeleteServicioUseCase {
 
   async execute(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+}
+
+export interface UploadReparacionFotoInput {
+  nombreArchivo: string;
+  mimeType: string;
+  datos: string;
+  observacion?: string | null;
+}
+
+export class AddReparacionFotoUseCase {
+  constructor(private readonly repository: ReparacionRepository) {}
+
+  async execute(reparacionId: string, input: UploadReparacionFotoInput): Promise<FotoReparacion> {
+    await this.getReparacionOrThrow(reparacionId);
+    return this.repository.addFoto(reparacionId, {
+      nombreArchivo: input.nombreArchivo,
+      mimeType: input.mimeType,
+      datos: input.datos,
+      observacion: input.observacion ?? null,
+    });
+  }
+
+  private async getReparacionOrThrow(id: string): Promise<ReparacionWithRelations> {
+    const reparacion = await this.repository.findById(id);
+    if (!reparacion) throw new Error('Reparación no encontrada');
+    return reparacion;
+  }
+}
+
+export class RemoveReparacionFotoUseCase {
+  constructor(private readonly repository: ReparacionRepository) {}
+
+  async execute(reparacionId: string, fotoId: string): Promise<void> {
+    const foto = await this.repository.findFotoById(reparacionId, fotoId);
+    if (!foto) throw new Error('Foto no encontrada');
+    await this.repository.deleteFoto(fotoId);
   }
 }

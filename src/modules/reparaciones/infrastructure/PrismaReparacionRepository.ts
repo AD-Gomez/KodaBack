@@ -8,8 +8,9 @@ import type {
 import type { ReparacionWithRelations } from '../domain/Reparacion.js';
 
 const RELATIONS = {
-  departamento: { select: { id: true, nombre: true } },
+  departamento: { select: { id: true, nombre: true, direccion: true } },
   solicitante: { select: { id: true, nombre: true } },
+  fotos: { orderBy: { createdAt: 'asc' as const } },
 } as const;
 
 export class PrismaReparacionRepository implements ReparacionRepository {
@@ -84,5 +85,35 @@ export class PrismaReparacionRepository implements ReparacionRepository {
       urgentes,
       inversionTotal: Number(financialAgg._sum.costo ?? 0),
     };
+  }
+
+  async addFoto(
+    reparacionId: string,
+    data: {
+      nombreArchivo: string;
+      mimeType: string;
+      datos: string;
+      observacion: string | null;
+    },
+  ) {
+    return this.prisma.fotoReparacion.create({
+      data: {
+        reparacionId,
+        nombreArchivo: data.nombreArchivo,
+        mimeType: data.mimeType,
+        datos: data.datos,
+        observacion: data.observacion,
+      },
+    });
+  }
+
+  async findFotoById(reparacionId: string, fotoId: string) {
+    return this.prisma.fotoReparacion.findFirst({
+      where: { id: fotoId, reparacionId },
+    });
+  }
+
+  async deleteFoto(fotoId: string): Promise<void> {
+    await this.prisma.fotoReparacion.delete({ where: { id: fotoId } });
   }
 }

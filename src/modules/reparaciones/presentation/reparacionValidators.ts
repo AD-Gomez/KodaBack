@@ -29,6 +29,31 @@ const estadoServicioEnum = z.enum(['ACTIVO', 'PROGRAMADO', 'PAUSADO', 'CANCELADO
 
 export const idParamSchema = z.object({ id: z.string().uuid('ID inválido') });
 
+export const reparacionFotoIdParamSchema = z.object({
+  id: z.string().uuid('ID de reparación inválido'),
+  fotoId: z.string().uuid('ID de foto inválido'),
+});
+
+export const reparacionPdfQuerySchema = z.object({
+  download: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((value) => value === 'true'),
+});
+
+export const uploadReparacionFotoSchema = z.object({
+  nombreArchivo: z.string().trim().min(1).max(180),
+  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  datos: z
+    .string()
+    .max(6_000_000, 'La imagen supera el tamaño permitido')
+    .regex(/^data:image\/(jpeg|png|webp);base64,/, 'Formato de imagen inválido'),
+  observacion: z.string().max(500).nullable().optional(),
+});
+
+export type ReparacionPdfQuery = z.infer<typeof reparacionPdfQuerySchema>;
+export type UploadReparacionFotoDto = z.infer<typeof uploadReparacionFotoSchema>;
+
 export const listReparacionesQuerySchema = z.object({
   estado: estadoReparacionEnum.optional(),
   prioridad: prioridadEnum.optional(),

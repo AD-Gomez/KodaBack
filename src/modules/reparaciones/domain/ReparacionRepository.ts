@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import type {
   EstadoReparacion,
   EstadoServicio,
+  FotoReparacion,
   FrecuenciaServicio,
   PrioridadReparacion,
   ReparacionWithRelations,
@@ -37,6 +38,17 @@ export interface ReparacionRepository {
   update(id: string, data: Prisma.ReparacionUpdateInput): Promise<ReparacionWithRelations>;
   delete(id: string): Promise<void>;
   getStats(): Promise<ReparacionStats>;
+  addFoto(
+    reparacionId: string,
+    data: {
+      nombreArchivo: string;
+      mimeType: string;
+      datos: string;
+      observacion: string | null;
+    },
+  ): Promise<FotoReparacion>;
+  findFotoById(reparacionId: string, fotoId: string): Promise<FotoReparacion | null>;
+  deleteFoto(fotoId: string): Promise<void>;
 }
 
 export interface ServicioActivoRepository {
