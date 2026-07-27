@@ -37,12 +37,13 @@ const publicRepo = new PrismaContratoRepository(prisma);
 const notificationRepo = new PrismaNotificacionRepository(prisma);
 
 const getEnvioUseCase = new GetEnvioFirmaByTokenUseCase(publicRepo);
+const ensurePdfUseCase = new EnsureEnvioPdfUseCase(publicRepo);
 const firmarEnvioUseCase = new FirmarEnvioUseCase(
   publicRepo,
   new NotifyContractSignedUseCase(notificationRepo),
+  ensurePdfUseCase,
 );
 const uploadCedulaUseCase = new UploadCedulaEnvioUseCase(publicRepo);
-const ensurePdfUseCase = new EnsureEnvioPdfUseCase(publicRepo);
 
 const firmaPublicaSchema = z.object({
   nombreLegal: z.string().trim().min(3).max(160),

@@ -344,6 +344,7 @@ export class FirmarEnvioUseCase {
   constructor(
     private readonly repository: ContratoRepository,
     private readonly notifier?: ContractSignedNotifier,
+    private readonly pdfRegenerator?: EnvioPdfRegenerator,
   ) {}
 
   async execute(
@@ -352,12 +353,24 @@ export class FirmarEnvioUseCase {
   ) {
     const envio = await this.repository.findEnvioFirmaByToken(token);
     if (!envio) throw new NotFoundError('Solicitud de firma');
-    if (envio.estado === 'FIRMADO' && envio.firmaData) return envio;
+    if (envio.estado === 'FIRMADO' && envio.firmaData) {
+      // El envío ya estaba firmado. Aun así, si hay un regenerador de PDF
+      // disponible, refrescamos el PDF para que refleje las firmas de todos
+      // los firmantes (puede haber firmas nuevas desde la última vez).
+      await this.tryRegenerateAllPdfs(envio.contratoId);
+      return envio;
+    }
 
     const contrato = await this.repository.findById(envio.contratoId);
     if (!contrato) throw new NotFoundError('Contrato');
 
     const firmado = await this.repository.markEnvioFirmaFirmado(envio.id, data);
+
+    // Regenerar el PDF de todos los envíos firmados para que cada uno
+    // muestre la lista completa de firmantes (incluyendo al que acaba de
+    // firmar). Sin esto, el PDF del primer firmante quedaría obsoleto
+    // porque solo el envío actual actualiza su propio pdfUrl.
+    await this.tryRegenerateAllPdfs(contrato.id);
 
     await this.tryMarkContratoFirmado(contrato.id);
 
@@ -398,6 +411,23 @@ export class FirmarEnvioUseCase {
     const todosFirmados = envios.every((e) => e.estado === 'FIRMADO');
     if (!todosFirmados) return;
     await this.repository.update(contratoId, { estado: 'FIRMADO' });
+  }
+
+  private async tryRegenerateAllPdfs(contratoId: string): Promise<void> {
+    if (!this.pdfRegenerator) return;
+    const contrato = await this.repository.findById(contratoId);
+    if (!contrato) return;
+    const enviosFirmados = (contrato.envios ?? []).filter((e) => e.estado === 'FIRMADO');
+    for (const envio of enviosFirmados) {
+      try {
+        await this.pdfRegenerator.regenerateForEnvio(envio, contrato);
+      } catch (err) {
+        logger.error(
+          { err, envioId: envio.id, contratoId: contrato.id },
+          'Fallo al regenerar el PDF de un envío firmado',
+        );
+      }
+    }
   }
 }
 
@@ -451,7 +481,11 @@ export interface EnsurePdfResult {
   generated: boolean;
 }
 
-export class EnsureEnvioPdfUseCase {
+export interface EnvioPdfRegenerator {
+  regenerateForEnvio(envio: EnvioFirma, contrato: ContratoCompleto): Promise<EnsurePdfResult>;
+}
+
+export class EnsureEnvioPdfUseCase implements EnvioPdfRegenerator {
   constructor(private readonly repository: ContratoRepository) {}
 
   async execute(token: string): Promise<EnsurePdfResult> {
@@ -463,9 +497,21 @@ export class EnsureEnvioPdfUseCase {
     if (!envio.nombreLegal) {
       throw new ValidationError('Falta el nombre legal del firmante.');
     }
-
     const contrato = await this.repository.findById(envio.contratoId);
     if (!contrato) throw new NotFoundError('Contrato');
+    return this.regenerateForEnvio(envio, contrato);
+  }
+
+  async regenerateForEnvio(
+    envio: EnvioFirma,
+    contrato: ContratoCompleto,
+  ): Promise<EnsurePdfResult> {
+    if (envio.estado !== 'FIRMADO' || !envio.firmaData || !envio.fechaFirmado) {
+      throw new ValidationError('La solicitud aún no ha sido firmada.');
+    }
+    if (!envio.nombreLegal) {
+      throw new ValidationError('Falta el nombre legal del firmante.');
+    }
 
     const tipoPorEmail = new Map(
       (contrato.firmas ?? []).flatMap((firma) =>
