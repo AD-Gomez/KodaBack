@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseInlineSegments } from './contractPdf.js';
+import { getBlockTextAlign, parseInlineSegments } from './contractPdf.js';
 
 describe('parseInlineSegments', () => {
   it('no imprime etiquetas vacías alrededor de un salto de línea', () => {
@@ -20,5 +20,16 @@ describe('parseInlineSegments', () => {
         format: { bold: true, italic: false, underline: false },
       },
     ]);
+  });
+});
+
+describe('getBlockTextAlign', () => {
+  it('conserva la justificación guardada por el editor', () => {
+    expect(getBlockTextAlign(' style="text-align: justify"')).toBe('justify');
+  });
+
+  it('mantiene los demás valores admitidos y usa izquierda por defecto', () => {
+    expect(getBlockTextAlign('style="text-align: center"')).toBe('center');
+    expect(getBlockTextAlign()).toBe('left');
   });
 });

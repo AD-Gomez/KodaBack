@@ -117,6 +117,8 @@ function parseDataUrl(dataUrl: string): Buffer | null {
 }
 
 type InlineFormat = { bold: boolean; italic: boolean; underline: boolean };
+type TextAlign = 'left' | 'center' | 'right' | 'justify';
+type BlockContext = { tag: string; align: TextAlign };
 
 const DEFAULT_FORMAT: InlineFormat = { bold: false, italic: false, underline: false };
 
@@ -129,6 +131,17 @@ const CONTRACT_BODY_FONT = 'Helvetica';
 const CONTRACT_BOLD_FONT = 'Helvetica-Bold';
 const CONTRACT_ITALIC_FONT = 'Helvetica-Oblique';
 const CONTRACT_BOLD_ITALIC_FONT = 'Helvetica-BoldOblique';
+
+/**
+ * El editor guarda la alineación en el atributo style del párrafo. PDFKit no
+ * interpreta HTML, por lo que hay que trasladar esa propiedad explícitamente
+ * al generar el documento descargable.
+ */
+export function getBlockTextAlign(attributes?: string): TextAlign {
+  const textAlign = /text-align\s*:\s*(left|center|right|justify)/i.exec(attributes ?? '')?.[1]?.toLowerCase();
+  if (textAlign === 'center' || textAlign === 'right' || textAlign === 'justify') return textAlign;
+  return 'left';
+}
 
 function chooseContractFont(format: InlineFormat): string {
   if (format.bold && format.italic) return CONTRACT_BOLD_ITALIC_FONT;
@@ -193,21 +206,21 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
   // espacio vacío a la derecha.
   const source = decodeHtmlEntities(html).replace(/\s*[\r\n]+\s*/g, ' ');
   const text = /<\/?[a-z][^>]*>/i.test(source) ? source : formatPlainContractContent(source);
-  const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(?:\s[^>]*)?>/gi;
-  const tagStack: string[] = [];
+  const tagPattern = /<\s*(\/?)\s*([a-z0-9]+)(\s[^>]*)?>/gi;
+  const tagStack: BlockContext[] = [];
   let buffer = '';
   let listIndex = 0;
 
   const inList = (): 'ul' | 'ol' | null => {
     for (let i = tagStack.length - 1; i >= 0; i--) {
-      const tag = tagStack[i];
+      const tag = tagStack[i]?.tag;
       if (tag === 'ul' || tag === 'ol') return tag;
       if (BLOCK_TAGS.has(tag ?? '')) return null;
     }
     return null;
   };
 
-  const flushParagraph = (blockTag: string | null) => {
+  const flushParagraph = (block: BlockContext | null) => {
     const trimmed = buffer
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{2,}/g, '\n')
@@ -215,6 +228,7 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     buffer = '';
     if (!trimmed) return;
 
+    const blockTag = block?.tag ?? null;
     const headingTag = blockTag && HEADING_TAGS.has(blockTag) ? blockTag : null;
     // Equivalente a la vista previa: 13 px (≈10 pt) y line-height 1.75.
     const baseSize =
@@ -260,6 +274,9 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
         const options = {
           continued: segmentIndex < segments.length - 1,
           width: doc.page.width - doc.page.margins.right - indent + widthOffset,
+          // Conserva la justificación elegida en el editor para el PDF que
+          // descarga el administrador. Los encabezados permanecen a la izquierda.
+          align: headingTag ? 'left' : block?.align ?? 'left',
           underline: segment.format.underline,
           lineGap,
         };
@@ -284,6 +301,7 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
     if (between) buffer += between;
     const closing = match[1] === '/';
     const rawTag = (match[2] ?? '').toLowerCase();
+    const attributes = match[3];
     lastIndex = tagPattern.lastIndex;
 
     if (rawTag === 'br') {
@@ -298,14 +316,14 @@ function renderContractContent(doc: PDFKit.PDFDocument, html: string) {
 
         if (rawTag === 'ul' || rawTag === 'ol') {
           listIndex = 0;
-          tagStack.push(rawTag);
+          tagStack.push({ tag: rawTag, align: getBlockTextAlign(attributes) });
         } else {
-          tagStack.push(rawTag);
+          tagStack.push({ tag: rawTag, align: getBlockTextAlign(attributes) });
         }
       } else {
         const top = tagStack[tagStack.length - 1];
-        if (top === rawTag) {
-          flushParagraph(rawTag);
+        if (top?.tag === rawTag) {
+          flushParagraph(top);
           tagStack.pop();
         }
       }
