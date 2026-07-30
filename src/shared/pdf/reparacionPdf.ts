@@ -214,6 +214,7 @@ function drawFotoSlot(doc: PDFKit.PDFDocument, opts: DrawFotoOptions) {
 export async function buildReparacionPdf(input: ReparacionPdfInput): Promise<Buffer> {
   const { reparacion } = input;
   const fotos = Array.isArray(reparacion.fotos) ? reparacion.fotos : [];
+  const arrendatario = reparacion.departamento?.arrendatario;
   const normalized = await Promise.all(fotos.map(normalizeFoto));
 
   const doc = new PDFDocument({
@@ -398,7 +399,44 @@ export async function buildReparacionPdf(input: ReparacionPdfInput): Promise<Buf
       width: colWidth / 2,
     });
 
-  doc.y = cardY + cardHeight + 18;
+  doc.y = cardY + cardHeight + 14;
+
+  // --- Contacto del arrendatario ---
+  if (arrendatario) {
+    const contactY = doc.y;
+    const contactHeight = 76;
+    doc
+      .save()
+      .lineWidth(0.8)
+      .strokeColor('#ddd6fe')
+      .roundedRect(cardX, contactY, cardWidth, contactHeight, 12)
+      .stroke()
+      .fillColor('#fafaff')
+      .roundedRect(cardX, contactY, cardWidth, contactHeight, 12)
+      .fill()
+      .restore();
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8.5)
+      .fillColor('#7c3aed')
+      .text('CONTACTO DEL ARRENDATARIO', colLeft, contactY + 13, { characterSpacing: 1.1 });
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(12)
+      .fillColor('#0f172a')
+      .text(arrendatario.nombre, colLeft, contactY + 28, { width: colWidth });
+    doc
+      .font('Helvetica')
+      .fontSize(9.5)
+      .fillColor('#475569')
+      .text(`Tel. ${arrendatario.telefono}`, colRight, contactY + 28, { width: colWidth });
+    doc
+      .font('Helvetica')
+      .fontSize(9.5)
+      .fillColor('#475569')
+      .text(arrendatario.email, colRight, contactY + 44, { width: colWidth });
+    doc.y = contactY + contactHeight + 18;
+  }
 
   // --- Detalle de la solicitud ---
   ensureSpace(doc, 80, margin);

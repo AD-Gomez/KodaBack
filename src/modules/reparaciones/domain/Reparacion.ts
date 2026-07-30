@@ -19,7 +19,12 @@ export type {
 };
 
 export interface ReparacionWithRelations extends Reparacion {
-  departamento?: { id: string; nombre: string; direccion?: string } | null;
+  departamento?: {
+    id: string;
+    nombre: string;
+    direccion?: string;
+    arrendatario?: { nombre: string; email: string; telefono: string } | null;
+  } | null;
   solicitante?: { id: string; nombre: string } | null;
   fotos?: FotoReparacion[];
 }

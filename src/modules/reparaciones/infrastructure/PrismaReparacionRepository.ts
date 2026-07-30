@@ -8,7 +8,14 @@ import type {
 import type { ReparacionWithRelations } from '../domain/Reparacion.js';
 
 const RELATIONS = {
-  departamento: { select: { id: true, nombre: true, direccion: true } },
+  departamento: {
+    select: {
+      id: true,
+      nombre: true,
+      direccion: true,
+      arrendatario: { select: { nombre: true, email: true, telefono: true } },
+    },
+  },
   solicitante: { select: { id: true, nombre: true } },
   fotos: { orderBy: { createdAt: 'asc' as const } },
 } as const;
